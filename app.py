@@ -18,7 +18,7 @@ def get_ai_client():
     try:
         return openai.OpenAI(
             base_url="https://api.groq.com/openai/v1",
-            api_key=st.secrets["GROQ_API_KEY"]
+            api_key=st.secrets["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"]
         )
     except: return None
 
@@ -105,4 +105,5 @@ with col2:
                         r = data['radar']
                         fig = go.Figure(data=go.Scatterpolar(r=list(r.values()), theta=list(r.keys()), fill='toself'))
                         fig.update_layout(height=200, margin=dict(t=20, b=20))
+
                         st.plotly_chart(fig, use_container_width=True)
