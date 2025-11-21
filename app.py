@@ -69,7 +69,7 @@ def analyze_candidate(job, cv_text):
     """
     try:
         res = client.chat.completions.create(
-            model="llama3-70b-8192",
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"}
         )
@@ -119,6 +119,7 @@ with col2:
                         )
                         fig.update_layout(height=200, margin=dict(t=20, b=20))
                         st.plotly_chart(fig, use_container_width=True)
+
 
 
 
