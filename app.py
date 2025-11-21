@@ -18,7 +18,7 @@ def get_ai_client():
     try:
         return openai.OpenAI(
             base_url="https://api.groq.com/openai/v1",
-            api_key=st.secrets["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"]
+            api_key=st.secrets["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"]
         )
     except: return None
 
@@ -107,3 +107,4 @@ with col2:
                         fig.update_layout(height=200, margin=dict(t=20, b=20))
 
                         st.plotly_chart(fig, use_container_width=True)
+
