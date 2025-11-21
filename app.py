@@ -15,17 +15,13 @@ st.set_page_config(page_title="AI Headhunter", layout="wide")
 
 # --- FONCTIONS SECRÈTES (API & DB) ---
 def get_ai_client():
-    # ON MET LA CLÉ EN DUR JUSTE POUR TESTER
-    # Remplacez par votre vraie clé gsk_...
-    CLE_EN_DUR = "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" 
-    
     try:
         return openai.OpenAI(
             base_url="https://api.groq.com/openai/v1",
-            api_key=CLE_EN_DUR 
+            api_key=st.secrets["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"]
         )
     except Exception as e:
-        st.error(f"Erreur : {e}")
+        st.error(f"Erreur OpenAI : {e}")
         return None
 
 def save_to_google_sheet(data):
@@ -36,21 +32,25 @@ def save_to_google_sheet(data):
         sheet = client.open("Recrutement_DB").sheet1
         sheet.append_row([
             datetime.datetime.now().strftime("%Y-%m-%d"),
-            data['infos']['nom'],
-            data['infos']['email'],
-            data['analyse']['score_global']
+            data['infos'].get('nom', ''),
+            data['infos'].get('email', ''),
+            data['analyse'].get('score_global', '')
         ])
-    except Exception as e: st.error(f"Erreur Google Sheet: {e}")
+    except Exception as e:
+        st.error(f"Erreur Google Sheet: {e}")
 
 # --- FONCTIONS MÉTIER ---
 def extract_text_from_pdf(file):
     try:
-        return "".join([p.extract_text() for p in PdfReader(file).pages])
-    except: return ""
+        return "".join([page.extract_text() or "" for page in PdfReader(file).pages])
+    except Exception as e:
+        st.error(f"Erreur extraction PDF: {e}")
+        return ""
 
 def analyze_candidate(job, cv_text):
     client = get_ai_client()
-    if not client: return None
+    if not client:
+        return None
     
     prompt = f"""
     Analyse ce CV pour ce JOB. Réponds UNIQUEMENT ce JSON :
@@ -74,7 +74,9 @@ def analyze_candidate(job, cv_text):
             response_format={"type": "json_object"}
         )
         return json.loads(res.choices[0].message.content)
-    except: return None
+    except Exception as e:
+        st.error(f"Erreur OpenAI API : {e}")
+        return None
 
 # --- INTERFACE ---
 st.title("🕵️‍♂️ AI Recruiter Dashboard")
@@ -92,23 +94,28 @@ with col2:
     if st.button("🚀 Lancer l'analyse") and files and job_desc:
         for f in files:
             txt = extract_text_from_pdf(f)
+            if not txt:
+                continue
             data = analyze_candidate(job_desc, txt)
-            
             if data:
                 # Sauvegarde
                 save_to_google_sheet(data)
-                
                 # Affichage
-                score = data['analyse']['score_global']
+                score = data['analyse'].get('score_global', 0)
                 color = "green" if score > 75 else "red"
-                with st.expander(f"{data['infos']['nom']} - {score}%"):
+                with st.expander(f"{data['infos'].get('nom','[Inconnu]')} - {score}%"):
                     c1, c2 = st.columns(2)
                     with c1:
-                        st.write(f"**Verdict:** {data['analyse']['verdict']}")
-                        st.write(f"**Tel:** {data['infos']['tel']}")
+                        st.write(f"**Verdict:** {data['analyse'].get('verdict','')}")
+                        st.write(f"**Tel:** {data['infos'].get('tel','')}")
                     with c2:
-                        # Graphique Radar
                         r = data['radar']
-                        fig = go.Figure(data=go.Scatterpolar(r=list(r.values()), theta=list(r.keys()), fill='toself'))
+                        fig = go.Figure(
+                            data=go.Scatterpolar(
+                                r=list(r.values()),
+                                theta=list(r.keys()),
+                                fill='toself'
+                            )
+                        )
                         fig.update_layout(height=200, margin=dict(t=20, b=20))
                         st.plotly_chart(fig, use_container_width=True)
