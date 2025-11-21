@@ -1,0 +1,9 @@
+streamlit
+openai
+pypdf
+pandas
+beautifulsoup4
+requests
+plotly
+gspread
+oauth2client
