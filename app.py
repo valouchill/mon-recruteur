@@ -18,7 +18,7 @@ def get_ai_client():
     try:
         return openai.OpenAI(
             base_url="https://api.groq.com/openai/v1",
-            api_key=st.secrets["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"]
+            api_key=st.secrets["GROQ_API_KEY"]
         )
     except Exception as e:
         st.error(f"Erreur OpenAI : {e}")
@@ -119,5 +119,6 @@ with col2:
                         )
                         fig.update_layout(height=200, margin=dict(t=20, b=20))
                         st.plotly_chart(fig, use_container_width=True)
+
 
 
