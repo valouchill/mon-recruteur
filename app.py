@@ -5,122 +5,162 @@ import json
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-import plotly.graph_objects as go
-import datetime
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+import re
 
-# --- CONFIGURATION ---
-st.set_page_config(page_title="AI Headhunter", layout="wide")
+# --- CONFIGURATION PAGE ---
+st.set_page_config(page_title="Recruteur IA - Web", layout="wide")
 
-# --- FONCTIONS SECRÈTES (API & DB) ---
-def get_ai_client():
+# --- SÉCURITÉ (MOT DE PASSE) ---
+def check_password():
+    """Retourne True si l'utilisateur a le bon mot de passe."""
+    if "password_correct" not in st.session_state:
+        st.session_state.password_correct = False
+
+    if st.session_state.password_correct:
+        return True
+
+    pwd = st.text_input("Mot de passe d'accès", type="password")
+    if st.button("Se connecter"):
+        # Le mot de passe est stocké dans les secrets de Streamlit
+        if pwd == st.secrets["APP_PASSWORD"]:
+            st.session_state.password_correct = True
+            st.rerun()
+        else:
+            st.error("Mot de passe incorrect")
+    return False
+
+if not check_password():
+    st.stop()
+
+# --- CONNEXION API (GROQ ou OPENAI) ---
+# On récupère la clé API depuis les secrets sécurisés du serveur
+try:
+    client = openai.OpenAI(
+        base_url="https://api.groq.com/openai/v1", # On utilise Groq pour la vitesse/gratuité
+        api_key=st.secrets["GROQ_API_KEY"]
+    )
+    # Modèle : Llama3-70b (très puissant et rapide sur Groq)
+    MODEL_NAME = "llama3-70b-8192"
+except Exception as e:
+    st.error(f"Erreur de configuration API : {e}")
+    st.stop()
+
+# --- FONCTIONS (Identiques à avant) ---
+
+def extract_text_from_pdf(uploaded_file):
     try:
-        return openai.OpenAI(
-            base_url="https://api.groq.com/openai/v1",
-            api_key=st.secrets["GROQ_API_KEY"]
-        )
-    except Exception as e:
-        st.error(f"Erreur OpenAI : {e}")
-        return None
+        reader = PdfReader(uploaded_file)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text()
+        return text
+    except: return None
 
-def save_to_google_sheet(data):
+def scrape_job_description(url):
     try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
-        client = gspread.authorize(creds)
-        sheet = client.open("Recrutement_DB").sheet1
-        sheet.append_row([
-            datetime.datetime.now().strftime("%Y-%m-%d"),
-            data['infos'].get('nom', ''),
-            data['infos'].get('email', ''),
-            data['analyse'].get('score_global', '')
-        ])
-    except Exception as e:
-        st.error(f"Erreur Google Sheet: {e}")
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            for s in soup(["script", "style", "nav", "footer"]): s.extract()
+            return soup.get_text(separator='\n')[:15000]
+    except: return None
+    return None
 
-# --- FONCTIONS MÉTIER ---
-def extract_text_from_pdf(file):
-    try:
-        return "".join([page.extract_text() or "" for page in PdfReader(file).pages])
-    except Exception as e:
-        st.error(f"Erreur extraction PDF: {e}")
-        return ""
-
-def analyze_candidate(job, cv_text):
-    client = get_ai_client()
-    if not client:
-        return None
-    
-    prompt = f"""
-    Analyse ce CV pour ce JOB. Réponds UNIQUEMENT ce JSON :
-    {{
-        "infos": {{ "nom": "Nom", "email": "Email", "tel": "Tel" }},
-        "analyse": {{ 
-            "score_global": 0-100 (int), 
-            "verdict": "Phrase courte",
-            "points_forts": ["A", "B"],
-            "manques": ["X", "Y"]
-        }},
-        "radar": {{ "Technique": int 0-10, "Expérience": int, "SoftSkills": int }}
-    }}
-    JOB: {job}
-    CV: {cv_text}
+def analyze_candidate_web(job_description, candidate_text):
+    system_prompt = """
+    Tu es un expert RH. Analyse ce CV pour extraire les infos de contact et la pertinence.
+    Réponds UNIQUEMENT avec ce JSON :
+    {
+        "nom_complet": "Prénom Nom",
+        "email": "email@domaine.com ou Non trouvé",
+        "telephone": "numéro ou Non trouvé",
+        "ville": "Ville ou Non trouvé",
+        "score_match": 0 à 100 (int),
+        "resume_profil": "Phrase courte",
+        "competences_cles": ["Skill 1", "Skill 2"],
+        "point_vigilance": "Rien à signaler ou problème potentiel"
+    }
     """
+    user_prompt = f"POSTE : {job_description}\n\nCV CANDIDAT : {candidate_text}"
+
     try:
-        res = client.chat.completions.create(
-            model="openai/gpt-oss-120b",
-            messages=[{"role": "user", "content": prompt}],
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+            temperature=0.1,
             response_format={"type": "json_object"}
         )
-        return json.loads(res.choices[0].message.content)
+        return json.loads(response.choices[0].message.content)
     except Exception as e:
-        st.error(f"Erreur OpenAI API : {e}")
         return None
 
-# --- INTERFACE ---
-st.title("🕵️‍♂️ AI Recruiter Dashboard")
+# --- INTERFACE WEB ---
+
+st.title("🌍 Plateforme de Recrutement IA")
+st.markdown("Dashboard de sourcing centralisé.")
 
 col1, col2 = st.columns([1, 2])
 
+if 'web_results' not in st.session_state:
+    st.session_state.web_results = []
+
 with col1:
-    st.subheader("1. Le Poste")
-    job_desc = st.text_area("Description du besoin", height=200)
+    st.subheader("1. Le Besoin")
+    tab_txt, tab_url = st.tabs(["Texte", "Import URL"])
+    job_desc = ""
+    with tab_txt:
+        manual_desc = st.text_area("Description", height=200)
+        if manual_desc: job_desc = manual_desc
+    with tab_url:
+        url_input = st.text_input("URL Offre (APEC, LinkedIn...)")
+        if st.button("Aspirer le site"):
+            scraped = scrape_job_description(url_input)
+            if scraped:
+                st.success("Contenu récupéré !")
+                st.info(scraped[:200] + "...")
+                job_desc = scraped # Pour l'analyse
+                # On sauve dans session pour ne pas perdre si refresh
+                st.session_state['scraped_desc'] = scraped
+            
+    # Récupération si déjà scrappé
+    if 'scraped_desc' in st.session_state and not job_desc:
+        job_desc = st.session_state['scraped_desc']
 
 with col2:
     st.subheader("2. Les Candidats")
-    files = st.file_uploader("Upload CVs", type=['pdf'], accept_multiple_files=True)
+    uploaded_files = st.file_uploader("Déposez les PDF", type=['pdf'], accept_multiple_files=True)
     
-    if st.button("🚀 Lancer l'analyse") and files and job_desc:
-        for f in files:
-            txt = extract_text_from_pdf(f)
-            if not txt:
-                continue
-            data = analyze_candidate(job_desc, txt)
-            if data:
-                # Sauvegarde
-                save_to_google_sheet(data)
-                # Affichage
-                score = data['analyse'].get('score_global', 0)
-                color = "green" if score > 75 else "red"
-                with st.expander(f"{data['infos'].get('nom','[Inconnu]')} - {score}%"):
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        st.write(f"**Verdict:** {data['analyse'].get('verdict','')}")
-                        st.write(f"**Tel:** {data['infos'].get('tel','')}")
-                    with c2:
-                        r = data['radar']
-                        fig = go.Figure(
-                            data=go.Scatterpolar(
-                                r=list(r.values()),
-                                theta=list(r.keys()),
-                                fill='toself'
-                            )
-                        )
-                        fig.update_layout(height=200, margin=dict(t=20, b=20))
-                        st.plotly_chart(fig, use_container_width=True)
+    if st.button("🚀 Lancer l'analyse Cloud", type="primary"):
+        if job_desc and uploaded_files:
+            progress = st.progress(0)
+            res = []
+            for i, file in enumerate(uploaded_files):
+                txt = extract_text_from_pdf(file)
+                if txt:
+                    data = analyze_candidate_web(job_desc, txt)
+                    if data: res.append(data)
+                progress.progress((i+1)/len(uploaded_files))
+            st.session_state.web_results = res
+            progress.empty()
 
-
-
-
-
+# --- RÉSULTATS ---
+if st.session_state.web_results:
+    st.divider()
+    df = pd.DataFrame(st.session_state.web_results)
+    if not df.empty:
+        df = df.sort_values(by='score_match', ascending=False)
+        
+        st.download_button(
+            "📥 Télécharger Excel",
+            data=df.to_csv(index=False).encode('utf-8'),
+            file_name='sourcing_export.csv',
+            mime='text/csv'
+        )
+        
+        for _, row in df.iterrows():
+            score = row['score_match']
+            color = "green" if score > 75 else "orange" if score > 50 else "red"
+            with st.expander(f"{row['nom_complet']} ({score}%)"):
+                st.write(f"**Tel:** {row['telephone']} | **Email:** {row['email']}")
+                st.info(row['resume_profil'])
