@@ -11,55 +11,89 @@ import io
 import re
 import time
 
-# --- 0. CONFIGURATION PAGE ---
-st.set_page_config(page_title="AI Recruiter Maestro", layout="wide", page_icon="✨")
+# --- 0. CONFIGURATION PAGE & THÈME FORCÉ ---
+st.set_page_config(
+    page_title="AI Recruiter Maestro", 
+    layout="wide", 
+    page_icon="✨",
+    initial_sidebar_state="expanded"
+)
 
-# --- CSS CORRIGÉ (CONTRASTE FORCÉ) ---
+# --- CSS "NUCLEAR" LIGHT MODE ---
 st.markdown("""
 <style>
-    /* Import Font */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-    
-    /* 1. FORCER LE THÈME CLAIR GLOBAL */
-    .stApp {
+    /* 1. VARIABLES GLOBALES FORCÉES */
+    :root {
+        --primary-color: #4f46e5;
+        --background-color: #f8f9fc;
+        --secondary-background-color: #ffffff;
+        --text-color: #1f2937;
+        --font: 'Inter', sans-serif;
+    }
+
+    /* 2. RESET COMPLET DU BODY ET APP */
+    [data-testid="stAppViewContainer"] {
         background-color: #f8f9fc !important;
-        color: #1f2937 !important; /* Texte gris foncé forcé */
+        color: #1f2937 !important;
+    }
+    
+    [data-testid="stSidebar"] {
+        background-color: #ffffff !important;
+        border-right: 1px solid #f0f0f0 !important;
+    }
+
+    [data-testid="stHeader"] {
+        background-color: rgba(255, 255, 255, 0) !important;
+    }
+
+    /* 3. CORRECTION DES INPUTS ET TEXT AREAS (SOUVENT SOMBRES) */
+    .stTextArea textarea, .stTextInput input {
+        background-color: #ffffff !important;
+        color: #1f2937 !important;
+        border: 1px solid #e5e7eb !important;
+    }
+    
+    /* 4. CORRECTION DES EXPANDERS (FOND BLANC PUR) */
+    .streamlit-expanderHeader {
+        background-color: #ffffff !important;
+        color: #1f2937 !important;
+        border-radius: 8px !important;
+    }
+    
+    .streamlit-expanderContent {
+        background-color: #ffffff !important;
+        color: #374151 !important;
+        border-top: 1px solid #f0f0f0 !important;
+    }
+    
+    /* 5. TYPOGRAPHIE & COULEURS DE TEXTE */
+    h1, h2, h3, h4, h5, h6, p, span, div {
+        color: #1f2937 !important;
         font-family: 'Inter', sans-serif !important;
     }
+    
+    .stMarkdown {
+        color: #374151 !important;
+    }
+    
+    /* --- DESIGN SYSTEM --- */
 
-    /* 2. CORRECTION DES TEXTES INVISIBLES DANS LES EXPANDERS */
+    /* CARD CONTAINER */
     div[data-testid="stExpander"] {
-        background-color: white !important;
         border: none !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        border-radius: 16px !important;
-        color: #1f2937 !important; /* Force le texte en noir */
-    }
-    
-    /* Force la couleur noire pour tous les paragraphes et spans dans l'app */
-    p, span, div, li {
-        color: #374151; /* Gris foncé lisible */
-    }
-    
-    /* Titres en noir profond */
-    h1, h2, h3, h4, h5, h6 {
-        color: #111827 !important;
-    }
-    
-    /* Correction spécifique pour les st.caption qui deviennent illisibles */
-    .stCaption {
-        color: #6b7280 !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+        border-radius: 12px !important;
+        background-color: white !important;
+        margin-bottom: 20px !important;
     }
 
-    /* --- RESTE DU DESIGN SYSTEM (Identique V11) --- */
-    
     /* HEADER DU CANDIDAT */
     .candidate-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
         padding-bottom: 15px;
-        border-bottom: 1px solid #f0f0f0;
+        border-bottom: 1px solid #f3f4f6;
         margin-bottom: 15px;
     }
     
@@ -70,30 +104,30 @@ st.markdown("""
     }
     
     .avatar {
-        width: 50px;
-        height: 50px;
+        width: 52px;
+        height: 52px;
         background: linear-gradient(135deg, #6366f1, #8b5cf6);
-        color: white !important; /* Texte blanc sur fond violet OK */
+        color: #ffffff !important; /* Blanc forcé sur l'avatar */
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-weight: bold;
-        font-size: 1.2rem;
+        font-weight: 700;
+        font-size: 1.25rem;
     }
-
+    
     /* SCORE BADGE */
     .score-ring {
-        width: 60px;
-        height: 60px;
+        width: 56px;
+        height: 56px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-weight: 900;
-        font-size: 1.2rem;
-        color: white !important;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        font-weight: 800;
+        font-size: 1.1rem;
+        color: #ffffff !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     .score-green { background: #10b981; border: 3px solid #d1fae5; }
     .score-orange { background: #f59e0b; border: 3px solid #fde68a; }
@@ -101,11 +135,11 @@ st.markdown("""
 
     /* VERDICT BOX */
     .verdict-container {
-        background-color: #eff6ff;
-        border-left: 4px solid #3b82f6;
-        padding: 15px;
+        background-color: #eff6ff !important;
+        border-left: 4px solid #3b82f6 !important;
+        padding: 16px;
         border-radius: 0 8px 8px 0;
-        color: #1e3a8a !important; /* Bleu foncé forcé */
+        color: #1e3a8a !important;
         font-size: 0.95rem;
         margin-bottom: 20px;
     }
@@ -116,13 +150,14 @@ st.markdown("""
         align-items: center;
         gap: 6px;
         padding: 6px 12px;
-        background-color: #f3f4f6;
-        border-radius: 20px;
-        color: #374151 !important;
+        background-color: #f9fafb !important;
+        border-radius: 9999px;
+        color: #4b5563 !important;
         font-size: 0.85rem;
+        font-weight: 500;
         margin-right: 8px;
         margin-bottom: 8px;
-        border: 1px solid #e5e7eb;
+        border: 1px solid #e5e7eb !important;
     }
 
     /* COMPÉTENCES TAGS */
@@ -130,18 +165,18 @@ st.markdown("""
         display: inline-block;
         padding: 4px 10px;
         border-radius: 6px;
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         font-weight: 600;
         margin: 2px;
     }
-    .tag-expert { background: #dcfce7; color: #166534 !important; border: 1px solid #bbf7d0; }
-    .tag-mid { background: #e0e7ff; color: #3730a3 !important; border: 1px solid #c7d2fe; }
-    .tag-miss { background: #fee2e2; color: #991b1b !important; text-decoration: line-through; opacity: 0.7; }
+    .tag-expert { background: #dcfce7 !important; color: #166534 !important; border: 1px solid #bbf7d0 !important; }
+    .tag-mid { background: #e0e7ff !important; color: #3730a3 !important; border: 1px solid #c7d2fe !important; }
+    .tag-miss { background: #fee2e2 !important; color: #991b1b !important; text-decoration: line-through; opacity: 0.8; }
 
     /* SALAIRE WIDGET */
     .salary-widget {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
+        background: #ffffff !important;
+        border: 1px solid #e5e7eb !important;
         border-radius: 12px;
         padding: 15px;
         text-align: center;
@@ -155,24 +190,19 @@ st.markdown("""
         background: linear-gradient(90deg, #10b981, #3b82f6);
     }
     .salary-value { font-size: 1.4rem; font-weight: 800; color: #111827 !important; }
-    .salary-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #9ca3af !important; margin-top: 5px; }
+    .salary-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #9ca3af !important; margin-top: 5px; }
 
-    /* KPI TOP BAR */
-    .kpi-container {
-        display: flex;
-        gap: 20px;
-        margin-bottom: 30px;
-    }
+    /* KPI CARD */
     .kpi-card {
-        flex: 1;
-        background: white;
-        padding: 15px;
+        background: white !important;
+        padding: 20px;
         border-radius: 12px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        border-left: 4px solid #8b5cf6;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border: 1px solid #f3f4f6;
+        text-align: center;
     }
-    .kpi-label { color: #6b7280 !important; font-size: 0.9rem; }
-    .kpi-val { color: #1f2937 !important; font-size: 1.8rem; font-weight: 800; }
+    .kpi-val { font-size: 2rem; font-weight: 800; color: #111827 !important; }
+    .kpi-lbl { font-size: 0.85rem; color: #6b7280 !important; text-transform: uppercase; letter-spacing: 0.5px; }
 
 </style>
 """, unsafe_allow_html=True)
@@ -292,12 +322,14 @@ with st.sidebar:
         st.session_state.results = []
         st.rerun()
 
-# Hero Section
+# Hero Section (Light Theme Forced)
 st.markdown("""
-<h1 style='text-align: center; margin-bottom: 10px; background: linear-gradient(to right, #4f46e5, #9333ea); -webkit-background-clip: text; -webkit-text-fill-color: transparent;'>
-    AI Recruiter Maestro
-</h1>
-<p style='text-align: center; color: #6b7280; margin-bottom: 40px;'>Le futur du recrutement : Analyse sémantique, Scoring prédictif et Intelligence Salariale.</p>
+<div style='text-align: center; padding-bottom: 30px;'>
+    <h1 style='background: linear-gradient(to right, #4f46e5, #9333ea); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 10px;'>
+        AI Recruiter Maestro
+    </h1>
+    <p style='color: #6b7280; font-size: 1.1rem;'>L'intelligence artificielle au service de votre recrutement.</p>
+</div>
 """, unsafe_allow_html=True)
 
 # Logique Analyse
@@ -325,22 +357,15 @@ if st.session_state.results:
     top_score = int(df['Score'].max())
     count = len(df)
     
-    st.markdown(f"""
-    <div class="kpi-container">
-        <div class="kpi-card">
-            <div class="kpi-label">Candidats Analysés</div>
-            <div class="kpi-val">{count}</div>
-        </div>
-        <div class="kpi-card" style="border-left-color: #10b981;">
-            <div class="kpi-label">Score Moyen</div>
-            <div class="kpi-val">{avg_score}%</div>
-        </div>
-        <div class="kpi-card" style="border-left-color: #f59e0b;">
-            <div class="kpi-label">Top Candidat</div>
-            <div class="kpi-val">{top_score}%</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(f"""<div class="kpi-card"><div class="kpi-lbl">Candidats</div><div class="kpi-val">{count}</div></div>""", unsafe_allow_html=True)
+    with col2:
+        st.markdown(f"""<div class="kpi-card"><div class="kpi-lbl">Moyenne</div><div class="kpi-val">{avg_score}%</div></div>""", unsafe_allow_html=True)
+    with col3:
+        st.markdown(f"""<div class="kpi-card"><div class="kpi-lbl">Top Score</div><div class="kpi-val">{top_score}%</div></div>""", unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
 
     sorted_results = sorted(st.session_state.results, key=lambda x: x['scores']['global'], reverse=True)
 
@@ -352,7 +377,6 @@ if st.session_state.results:
         score_color = "score-green" if s['global'] >= 75 else "score-orange" if s['global'] >= 50 else "score-red"
         initials = "".join([n[0] for n in i['nom'].split()[:2]]).upper()
         
-        # EXPANDER AVEC FOND BLANC FORCÉ
         with st.expander(f"{i['nom']}  •  {s['global']}%", expanded=(idx == 0)):
             
             # Header HTML
@@ -361,8 +385,8 @@ if st.session_state.results:
                 <div class="candidate-profile">
                     <div class="avatar">{initials}</div>
                     <div class="candidate-info">
-                        <h3>{i['nom']}</h3>
-                        <p>{i['poste_actuel']} • {i['ville']}</p>
+                        <h3 style="color:#1f2937 !important;">{i['nom']}</h3>
+                        <p style="color:#6b7280 !important;">{i['poste_actuel']} • {i['ville']}</p>
                     </div>
                 </div>
                 <div class="score-ring {score_color}">
@@ -372,7 +396,7 @@ if st.session_state.results:
             """, unsafe_allow_html=True)
             
             # Contact Bar HTML
-            linkedin_link = f'<a href="{i["linkedin"]}" target="_blank" style="text-decoration:none;">🔗 LinkedIn</a>' if i['linkedin'] else '<span style="color:#ccc">🔗 No LinkedIn</span>'
+            linkedin_link = f'<a href="{i["linkedin"]}" target="_blank" style="text-decoration:none; color:#4f46e5;">🔗 LinkedIn</a>' if i['linkedin'] else '<span style="color:#ccc">🔗 No LinkedIn</span>'
             st.markdown(f"""
             <div style="margin-bottom: 20px;">
                 <span class="contact-pill">📧 {i['email']}</span>
@@ -392,10 +416,10 @@ if st.session_state.results:
                 c1, c2 = st.columns(2)
                 with c1:
                     st.markdown("**✅ POINTS FORTS**")
-                    for f in d['analyse']['points_forts'][:3]: st.markdown(f"• {f}")
+                    for f in d['analyse']['points_forts'][:3]: st.markdown(f"<div style='color:#166534; margin-bottom:4px;'>• {f}</div>", unsafe_allow_html=True)
                 with c2:
                     st.markdown("**⚠️ VIGILANCE**")
-                    for f in d['analyse']['points_faibles'][:3]: st.markdown(f"• {f}")
+                    for f in d['analyse']['points_faibles'][:3]: st.markdown(f"<div style='color:#991b1b; margin-bottom:4px;'>• {f}</div>", unsafe_allow_html=True)
                 
                 st.markdown("---")
                 
@@ -439,8 +463,10 @@ if st.session_state.results:
                 fig.update_layout(
                     height=180, 
                     margin=dict(l=20, r=20, t=20, b=20),
-                    polar=dict(radialaxis=dict(visible=False, range=[0, 100])),
-                    showlegend=False
+                    polar=dict(radialaxis=dict(visible=False, range=[0, 100]), bgcolor='white'),
+                    showlegend=False,
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)'
                 )
                 st.plotly_chart(fig, use_container_width=True, key=f"radar_{idx}")
 
