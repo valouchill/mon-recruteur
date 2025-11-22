@@ -189,7 +189,7 @@ def analyze_candidate(job, cv, criteria=""):
     """
     try:
         res = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             temperature=0.1
@@ -381,3 +381,4 @@ else:
                         <div class="q-answer">💡 Attendu : {q.get('attendu')}</div>
                     </div>
                     """, unsafe_allow_html=True)
+
