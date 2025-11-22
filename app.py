@@ -18,7 +18,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS FLAT & HARMONISÉ (CORRECTIF UPLOADERS) ---
+# --- CSS FLAT & HARMONISÉ (CORRECTIF TEXT AREAS) ---
 st.markdown("""
 <style>
     /* IMPORT FONT INTER */
@@ -28,8 +28,8 @@ st.markdown("""
     :root {
         --primary: #4f46e5;       /* Indigo 600 */
         --primary-light: #e0e7ff; /* Indigo 100 */
-        --text-main: #312e81;     /* Indigo 900 */
-        --text-sub: #64748b;      /* Slate 500 */
+        --text-main: #312e81;     /* Indigo 900 (Texte principal) */
+        --text-sub: #64748b;      /* Slate 500 (Texte secondaire) */
         --bg-app: #f8fafc;        /* Slate 50 */
         --border: #cbd5e1;        /* Slate 300 */
         --card-bg: #ffffff;
@@ -46,37 +46,57 @@ st.markdown("""
     /* 3. SIDEBAR CLEAN */
     [data-testid="stSidebar"] { background-color: white; border-right: 1px solid var(--border); }
     [data-testid="stSidebar"] * { color: var(--text-main); }
-    [data-testid="stSidebar"] p, [data-testid="stSidebar"] label, [data-testid="stSidebar"] small { color: var(--text-sub) !important; }
+    
+    /* Force la couleur des labels dans la sidebar */
+    [data-testid="stSidebar"] label, [data-testid="stSidebar"] p { 
+        color: var(--text-sub) !important; 
+    }
 
-    /* --- CORRECTIF UPLOADERS (DROPZONES) --- */
-    /* Force la couleur du texte et des icônes à l'intérieur de la zone de drop */
-    [data-testid="stFileUploader"] section {
-        background-color: #f8fafc !important; /* Fond très léger */
-        border: 1px dashed var(--border) !important;
+    /* --- CORRECTIF INPUTS & TEXT AREAS --- */
+    /* Cible les zones de texte ("Ou texte offre", "Critères") */
+    .stTextArea textarea, .stTextInput input {
+        color: var(--text-main) !important; /* Texte saisi en Indigo foncé */
+        caret-color: var(--primary) !important; /* Curseur de saisie */
+        background-color: #f8fafc !important;
+        border: 1px solid var(--border) !important;
     }
     
-    /* Le texte "Drag and drop..." et "Limit 200MB..." */
+    /* Couleur du texte "placeholder" (gris clair quand vide) */
+    .stTextArea textarea::placeholder, .stTextInput input::placeholder {
+        color: #94a3b8 !important; /* Slate 400 */
+    }
+    
+    /* Couleur des labels au-dessus des inputs */
+    .stTextArea label, .stTextInput label {
+        color: var(--text-sub) !important;
+        font-weight: 500 !important;
+    }
+    
+    /* Focus (quand on clique dedans) */
+    .stTextArea textarea:focus, .stTextInput input:focus {
+        border-color: var(--primary) !important;
+        box-shadow: 0 0 0 1px var(--primary) !important;
+    }
+
+    /* --- CORRECTIF UPLOADERS (DROPZONES) --- */
+    [data-testid="stFileUploader"] section {
+        background-color: #f8fafc !important;
+        border: 1px dashed var(--border) !important;
+    }
     [data-testid="stFileUploader"] section > div, 
     [data-testid="stFileUploader"] section span, 
     [data-testid="stFileUploader"] section small {
         color: var(--text-sub) !important; 
     }
-    
-    /* L'icône de nuage/upload */
     [data-testid="stFileUploader"] svg {
         fill: var(--text-sub) !important;
         color: var(--text-sub) !important;
     }
-    
-    /* Le bouton "Browse files" */
     [data-testid="stFileUploader"] button {
         color: var(--primary) !important;
         border-color: var(--primary) !important;
         background-color: white !important;
         font-weight: 500;
-    }
-    [data-testid="stFileUploader"] button:hover {
-        background-color: var(--primary-light) !important;
     }
 
     /* 4. KPI CARDS */
