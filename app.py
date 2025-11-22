@@ -19,51 +19,134 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS (Même style harmonisé) ---
+# --- CSS (DESIGN SYSTEM HARMONISÉ & THÈME CLAIR FORCÉ) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    :root { --primary: #4f46e5; --primary-light: #e0e7ff; --text-main: #312e81; --text-sub: #64748b; --bg-app: #f8fafc; --border: #cbd5e1; }
+    
+    :root { 
+        --primary: #4f46e5; 
+        --primary-light: #e0e7ff; 
+        --text-main: #312e81; 
+        --text-sub: #64748b; 
+        --bg-app: #f8fafc; 
+        --border: #cbd5e1; 
+    }
+    
+    /* RESET GLOBAL */
     .stApp { background-color: var(--bg-app); font-family: 'Inter', sans-serif; color: var(--text-main); }
+    
+    /* TYPOGRAPHIE */
     h1, h2, h3, h4, .stMarkdown { color: var(--text-main) !important; font-family: 'Inter', sans-serif; }
     p, li, label, .stCaption { color: var(--text-sub) !important; }
+    
+    /* SIDEBAR */
     [data-testid="stSidebar"] { background-color: white; border-right: 1px solid var(--border); }
     [data-testid="stSidebar"] * { color: var(--text-main); }
     [data-testid="stSidebar"] label, [data-testid="stSidebar"] p { color: var(--text-sub) !important; }
-    .stTextArea textarea, .stTextInput input { color: var(--text-main) !important; caret-color: var(--primary) !important; background-color: #f8fafc !important; border: 1px solid var(--border) !important; }
-    div[data-testid="stExpander"] { background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: none !important; margin-bottom: 16px; }
-    .streamlit-expanderHeader { background-color: white !important; color: var(--text-main) !important; font-weight: 600; border-bottom: 1px solid #f1f5f9; }
+    
+    /* INPUTS */
+    .stTextArea textarea, .stTextInput input { 
+        color: var(--text-main) !important; 
+        caret-color: var(--primary) !important; 
+        background-color: #f8fafc !important; 
+        border: 1px solid var(--border) !important; 
+    }
+    
+    /* CARTE EXPANDER */
+    div[data-testid="stExpander"] { 
+        background: white; 
+        border: 1px solid var(--border); 
+        border-radius: 8px; 
+        box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important; 
+        margin-bottom: 16px; 
+        overflow: hidden;
+    }
+    .streamlit-expanderHeader { 
+        background-color: white !important; 
+        color: var(--text-main) !important; 
+        font-weight: 600; 
+        border-bottom: 1px solid #f1f5f9; 
+    }
     .streamlit-expanderHeader:hover { color: var(--primary) !important; }
     .streamlit-expanderHeader svg { fill: var(--text-sub) !important; }
-    .kpi-card { background: white; padding: 20px; border: 1px solid var(--border); border-radius: 8px; text-align: center; height: 100%; }
+    
+    /* KPI CARDS */
+    .kpi-card { 
+        background: white; 
+        padding: 20px; 
+        border: 1px solid var(--border); 
+        border-radius: 8px; 
+        text-align: center; 
+        height: 100%; 
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
     .kpi-val { font-size: 1.6rem; font-weight: 700; color: var(--primary); margin-bottom: 5px; }
     .kpi-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+    
+    /* HEADER CANDIDAT */
     .header-row { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 15px; border-bottom: 1px solid #f1f5f9; margin-bottom: 20px; }
     .c-name { font-size: 1.3rem; font-weight: 700; color: var(--text-main); margin: 0; }
     .c-job { font-size: 0.95rem; color: var(--text-sub); margin-top: 2px; }
     .score-box { background: var(--primary); color: white; padding: 8px 16px; border-radius: 6px; font-weight: 700; font-size: 1rem; }
-    .pill { background: #f1f5f9; border: 1px solid #e2e8f0; color: var(--text-main); padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; margin-top: 8px; }
+    
+    /* TAGS & PILLS */
+    .pill { 
+        background: #f1f5f9; 
+        border: 1px solid #e2e8f0; 
+        color: var(--text-main); 
+        padding: 5px 12px; 
+        border-radius: 6px; 
+        font-size: 0.8rem; 
+        font-weight: 500; 
+        display: inline-flex; 
+        align-items: center; 
+        gap: 6px; 
+        margin-right: 8px; 
+        margin-top: 8px; 
+    }
     .pill a { color: var(--primary) !important; text-decoration: none; font-weight: 600; }
+    
+    /* ANALYSE BOXES */
     .analysis-container { border: 1px solid var(--border); background-color: #f8fafc; border-radius: 6px; padding: 15px; height: 100%; }
     .analysis-title { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-bottom: 10px; display: block; }
     .list-item { font-size: 0.9rem; margin-bottom: 6px; display: block; color: var(--text-main); }
     .txt-success { color: #15803d; }
     .txt-danger { color: #b91c1c; }
-    .verdict { background: var(--primary-light); color: var(--text-main); padding: 15px; border-radius: 6px; font-weight: 500; font-size: 0.95rem; line-height: 1.5; border: 1px solid #c7d2fe; margin-bottom: 20px; }
+    
+    .verdict { 
+        background: var(--primary-light); 
+        color: var(--text-main); 
+        padding: 15px; 
+        border-radius: 6px; 
+        font-weight: 500; 
+        font-size: 0.95rem; 
+        line-height: 1.5; 
+        border-left: 4px solid var(--primary); 
+        margin-bottom: 20px; 
+    }
+    
+    /* TIMELINE */
     .tl-item { border-left: 2px solid var(--border); padding-left: 15px; margin-bottom: 20px; padding-bottom: 5px; }
     .tl-title { font-weight: 700; color: var(--text-main); font-size: 0.95rem; }
     .tl-date { font-size: 0.75rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600; margin-bottom: 5px; display: block;}
-    .tl-desc { font-size: 0.9rem; color: var(--text-sub); }
+    .tl-desc { font-size: 0.9rem; color: var(--text-sub); font-style: italic; }
+    
+    /* SKILLS */
     .skill-tag { background: white; border: 1px solid var(--border); color: var(--text-main); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 500; display: inline-block; margin: 2px; }
     .skill-tag.match { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
     .skill-tag.missing { background: #fef2f2; border-color: #fecaca; color: #991b1b; text-decoration: line-through; opacity: 0.7;}
+    
+    /* SALAIRE */
     .salary-amount { font-size: 1.5rem; font-weight: 700; color: var(--text-main); }
+    
+    /* QUESTIONS */
     .question-box { background-color: #f1f5f9; border-left: 3px solid var(--primary); padding: 12px; margin-bottom: 10px; border-radius: 0 6px 6px 0; }
     .q-theme { text-transform: uppercase; font-size: 0.7rem; color: var(--primary); font-weight: 700; margin-bottom: 4px; }
     .q-text { font-weight: 600; color: var(--text-main); font-size: 0.9rem; margin-bottom: 6px; }
     .q-answer { font-size: 0.85rem; color: var(--text-sub); font-style: italic; }
     
-    /* Correctif Uploader */
+    /* UPLOADER FIX */
     [data-testid="stFileUploader"] section { background-color: #f8fafc !important; border: 1px dashed var(--border) !important; }
     [data-testid="stFileUploader"] section > div, [data-testid="stFileUploader"] section span, [data-testid="stFileUploader"] section small { color: var(--text-sub) !important; }
     [data-testid="stFileUploader"] svg { fill: var(--text-sub) !important; }
@@ -132,7 +215,10 @@ def analyze_candidate(job, cv, criteria="", file_id=""):
     CRITERES: {criteria}
     CV: {cv[:3000]}
     
-    TACHE: Analyse critique.
+    TACHE: Analyse critique et extraction d'infos.
+    
+    INSTRUCTION: Pour l'historique, génère un "resume_synthetique" de 2 lignes max par poste.
+    
     JSON STRICT:
     {{
         "infos": {{ "nom": "Prénom Nom", "email": "...", "tel": "...", "ville": "...", "linkedin": "...", "poste_actuel": "..." }},
@@ -205,7 +291,7 @@ if launch_btn:
         prog = st.progress(0)
         
         for i, f in enumerate(cv_files):
-            # Reset du curseur fichier (CRITIQUE pour éviter les fichiers vides)
+            # Reset du curseur fichier
             f.seek(0)
             txt = extract_pdf(f)
             
@@ -230,7 +316,7 @@ if launch_btn:
 if not st.session_state.results:
     st.markdown("""
     <div style="text-align: center; padding: 60px 20px; color: var(--text-sub);">
-        <h1 style="color: var(--text-main);">Bienvenue sur AI Recruiter</h1>
+        <h1 style="color: var(--text-main);">Bienvenue sur AI Recruiter PRO</h1>
         <p>Interface simplifiée pour l'analyse de candidatures.</p>
         <div style="margin-top: 40px; display: inline-flex; gap: 20px;">
             <div style="border:1px solid #e2e8f0; padding:20px; border-radius:8px; width:180px; color: var(--text-main);">📂 Importez l'Offre</div>
@@ -243,13 +329,19 @@ if not st.session_state.results:
 else:
     # KPI TOP
     sorted_res = sorted(st.session_state.results, key=lambda x: x['scores']['global'], reverse=True)
-    avg = int(statistics.mean([r['scores']['global'] for r in sorted_res]))
+    
+    if sorted_res:
+        avg = int(statistics.mean([r['scores']['global'] for r in sorted_res]))
+        top_s = sorted_res[0]['scores']['global']
+        qualified = len([x for x in sorted_res if x['scores']['global']>=70])
+    else:
+        avg, top_s, qualified = 0, 0, 0
     
     col1, col2, col3, col4 = st.columns(4)
     col1.markdown(f"""<div class="kpi-card"><div class="kpi-val">{len(sorted_res)}</div><div class="kpi-label">Dossiers</div></div>""", unsafe_allow_html=True)
     col2.markdown(f"""<div class="kpi-card"><div class="kpi-val">{avg}%</div><div class="kpi-label">Score Moyen</div></div>""", unsafe_allow_html=True)
-    col3.markdown(f"""<div class="kpi-card"><div class="kpi-val">{len([x for x in sorted_res if x['scores']['global']>=70])}</div><div class="kpi-label">Qualifiés</div></div>""", unsafe_allow_html=True)
-    col4.markdown(f"""<div class="kpi-card"><div class="kpi-val">{sorted_res[0]['scores']['global']}%</div><div class="kpi-label">Top Score</div></div>""", unsafe_allow_html=True)
+    col3.markdown(f"""<div class="kpi-card"><div class="kpi-val">{qualified}</div><div class="kpi-label">Qualifiés</div></div>""", unsafe_allow_html=True)
+    col4.markdown(f"""<div class="kpi-card"><div class="kpi-val">{top_s}%</div><div class="kpi-label">Top Score</div></div>""", unsafe_allow_html=True)
     
     st.write("") 
 
@@ -259,7 +351,7 @@ else:
         s = d['scores']
         
         # KEY UNIQUE POUR CHAQUE EXPANDER
-        unique_key = f"exp_{idx}_{i['nom']}_{uuid.uuid4()}"
+        unique_key = f"exp_{idx}_{uuid.uuid4()}"
         
         with st.expander(f"{i['nom']}  —  {s['global']}%", expanded=(idx==0)):
             
@@ -330,20 +422,27 @@ else:
                 </div>
                 """, unsafe_allow_html=True)
                 
+                # Radar fermé
                 cat = ['Tech', 'Exp', 'Soft', 'Fit', 'Tech']
                 val = [s['tech'], s['experience'], s['soft'], s['fit'], s['tech']]
+                
                 fig = go.Figure(go.Scatterpolar(
                     r=val, theta=cat, fill='toself',
                     line_color='#4f46e5', fillcolor='rgba(79, 70, 229, 0.1)'
                 ))
                 fig.update_layout(
-                    polar=dict(radialaxis=dict(visible=True, range=[0, 100], showticklabels=False, linecolor='rgba(0,0,0,0)'),
-                               angularaxis=dict(tickfont=dict(size=10, color='#64748b'))),
-                    showlegend=False, margin=dict(t=20, b=20, l=30, r=30), height=220,
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+                    polar=dict(
+                        radialaxis=dict(visible=True, range=[0, 100], showticklabels=False, linecolor='rgba(0,0,0,0)'),
+                        angularaxis=dict(tickfont=dict(size=10, color='#64748b'))
+                    ),
+                    showlegend=False, 
+                    margin=dict(t=20, b=20, l=30, r=30), 
+                    height=220,
+                    paper_bgcolor='rgba(0,0,0,0)', 
+                    plot_bgcolor='rgba(0,0,0,0)'
                 )
                 
-                # KEY UNIQUE POUR PLOTLY
+                # KEY UNIQUE
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=unique_key)
             
             # SKILLS
