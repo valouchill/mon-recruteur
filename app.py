@@ -9,6 +9,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import io
 import statistics
+import uuid  # <-- IMPORT ESSENTIEL POUR CORRIGER LE BUG
 
 # --- 0. CONFIGURATION PAGE ---
 st.set_page_config(
@@ -21,48 +22,32 @@ st.set_page_config(
 # --- CSS FLAT & HARMONISÉ ---
 st.markdown("""
 <style>
-    /* IMPORT FONT INTER */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-    /* 1. VARIABLES COULEURS */
     :root {
-        --primary: #4f46e5;       /* Indigo 600 */
-        --primary-light: #e0e7ff; /* Indigo 100 */
-        --text-main: #312e81;     /* Indigo 900 */
-        --text-sub: #64748b;      /* Slate 500 */
-        --bg-app: #f8fafc;        /* Slate 50 */
-        --border: #cbd5e1;        /* Slate 300 */
-        --card-bg: #ffffff;
+        --primary: #4f46e5;
+        --primary-light: #e0e7ff;
+        --text-main: #312e81;
+        --text-sub: #64748b;
+        --bg-app: #f8fafc;
+        --border: #cbd5e1;
     }
 
-    /* 2. RESET GLOBAL */
     .stApp { background-color: var(--bg-app); font-family: 'Inter', sans-serif; color: var(--text-main); }
     h1, h2, h3, h4, .stMarkdown { color: var(--text-main) !important; font-family: 'Inter', sans-serif; }
     p, li, label, .stCaption { color: var(--text-sub) !important; }
     
-    /* 3. SIDEBAR */
     [data-testid="stSidebar"] { background-color: white; border-right: 1px solid var(--border); }
     [data-testid="stSidebar"] * { color: var(--text-main); }
     [data-testid="stSidebar"] label, [data-testid="stSidebar"] p { color: var(--text-sub) !important; }
 
-    /* CORRECTIF INPUTS */
     .stTextArea textarea, .stTextInput input {
         color: var(--text-main) !important;
         caret-color: var(--primary) !important;
         background-color: #f8fafc !important;
         border: 1px solid var(--border) !important;
     }
-    .stTextArea textarea::placeholder, .stTextInput input::placeholder { color: #94a3b8 !important; }
-    .stTextArea textarea:focus, .stTextInput input:focus { border-color: var(--primary) !important; box-shadow: 0 0 0 1px var(--primary) !important; }
-    .stTextArea label, .stTextInput label { color: var(--text-sub) !important; font-weight: 500 !important; }
-
-    /* CORRECTIF UPLOADERS */
-    [data-testid="stFileUploader"] section { background-color: #f8fafc !important; border: 1px dashed var(--border) !important; }
-    [data-testid="stFileUploader"] section > div, [data-testid="stFileUploader"] section span, [data-testid="stFileUploader"] section small { color: var(--text-sub) !important; }
-    [data-testid="stFileUploader"] svg { fill: var(--text-sub) !important; }
-    [data-testid="stFileUploader"] button { color: var(--primary) !important; border-color: var(--primary) !important; background-color: white !important; }
-
-    /* CORRECTIF EXPANDER */
+    
     div[data-testid="stExpander"] {
         background: white; border: 1px solid var(--border); border-radius: 8px; 
         box-shadow: none !important; margin-bottom: 16px;
@@ -76,7 +61,6 @@ st.markdown("""
     .streamlit-expanderHeader:hover { color: var(--primary) !important; }
     .streamlit-expanderHeader svg { fill: var(--text-sub) !important; }
 
-    /* DESIGN ELEMENTS */
     .kpi-card { background: white; padding: 20px; border: 1px solid var(--border); border-radius: 8px; text-align: center; height: 100%; }
     .kpi-val { font-size: 1.6rem; font-weight: 700; color: var(--primary); margin-bottom: 5px; }
     .kpi-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
@@ -160,35 +144,31 @@ def get_client():
 
 def extract_pdf(file):
     try: 
-        # On utilise BytesIO directement sur le contenu
         return "\n".join([p.extract_text() for p in PdfReader(io.BytesIO(file)).pages if p.extract_text()])
     except: return ""
 
-# --- CORRECTIF : PLUS DE CACHE ICI POUR EVITER LES DUPLICATAS ---
-def analyze_candidate(job, cv, criteria="", file_name="unknown"):
+def analyze_candidate(job, cv, criteria="", file_id=""):
     client = get_client()
     if not client: return None
     
-    # On intègre le nom du fichier dans le prompt pour garantir l'unicité
+    # ID unique injecté dans le prompt pour éviter le cache implicite
     prompt = f"""
-    ROLE: Expert Recrutement & Chasseur de Têtes.
-    FICHIER: {file_name}
+    ID_ANALYSIS: {file_id}
+    ROLE: Expert Recrutement.
     OFFRE: {job[:1500]}
     CRITERES: {criteria}
     CV: {cv[:3000]}
     
     TACHE: Analyse critique.
-    IMPORTANT: La section "entretien" doit contenir 3 questions PIÈGES/CHALLENGE spécifiques aux lacunes du candidat par rapport à l'offre.
-    
     JSON STRICT:
     {{
         "infos": {{ "nom": "Prénom Nom", "email": "...", "tel": "...", "ville": "...", "linkedin": "...", "poste_actuel": "..." }},
         "scores": {{ "global": 0-100, "tech": 0-100, "experience": 0-100, "soft": 0-100, "fit": 0-100 }},
         "salaire": {{ "min": int, "max": int, "confiance": "Haute/Basse", "analyse": "Court commentaire" }},
         "competences": {{ "match": ["Skill A", "Skill B"], "manquant": ["Skill C"] }},
-        "analyse": {{ "verdict": "Synthèse objective (2 lignes).", "points_forts": ["Point A", "Point B"], "points_faibles": ["Point C", "Point D"] }},
-        "historique": [ {{ "titre": "...", "entreprise": "...", "duree": "...", "resume_synthetique": "Action principale." }} ],
-        "entretien": [ {{ "theme": "Challenge", "question": "Question précise", "attendu": "Réponse idéale" }} ]
+        "analyse": {{ "verdict": "Synthèse objective (2 lignes).", "points_forts": ["Point A"], "points_faibles": ["Point B"] }},
+        "historique": [ {{ "titre": "...", "entreprise": "...", "duree": "...", "resume_synthetique": "Action." }} ],
+        "entretien": [ {{ "theme": "Challenge", "question": "Question", "attendu": "Reponse" }} ]
     }}
     """
     try:
@@ -232,13 +212,14 @@ if launch_btn and job_text and cv_files:
     res = []
     prog = st.progress(0)
     for i, f in enumerate(cv_files):
-        # Reset du pointeur de fichier pour être sûr de bien lire
-        f.seek(0) 
+        f.seek(0) # Reset file pointer
         txt = extract_pdf(f.read())
         
-        if txt and len(txt) > 50: # Vérification contenu minimum
-            # On passe le nom du fichier pour unicité
-            d = analyze_candidate(job_text, txt, criteria, file_name=f.name)
+        # Génération d'un ID unique pour cette analyse
+        unique_id = str(uuid.uuid4())
+        
+        if txt and len(txt) > 50:
+            d = analyze_candidate(job_text, txt, criteria, file_id=unique_id)
             if d: 
                 save_to_sheets(d, job_text)
                 res.append(d)
@@ -272,14 +253,16 @@ else:
     col3.markdown(f"""<div class="kpi-card"><div class="kpi-val">{len([x for x in sorted_res if x['scores']['global']>=70])}</div><div class="kpi-label">Qualifiés</div></div>""", unsafe_allow_html=True)
     col4.markdown(f"""<div class="kpi-card"><div class="kpi-val">{sorted_res[0]['scores']['global']}%</div><div class="kpi-label">Top Score</div></div>""", unsafe_allow_html=True)
     
-    st.write("") # Spacer
+    st.write("") 
 
     # LISTE CANDIDATS
     for idx, d in enumerate(sorted_res):
         i = d['infos']
         s = d['scores']
         
-        # KEY UNIQUE SUR L'EXPANDER AUSSI
+        # --- FIX BUG: CLÉ UNIQUE POUR L'EXPANDER ---
+        unique_expander_key = f"exp_{idx}_{i['email']}"
+        
         with st.expander(f"{i['nom']}  —  {s['global']}%", expanded=(idx==0)):
             
             # HEADER
@@ -361,10 +344,11 @@ else:
                     showlegend=False, margin=dict(t=20, b=20, l=30, r=30), height=220,
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
                 )
-                # KEY UNIQUE AJOUTÉE POUR EVITER LE BUG
-                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=f"radar_{idx}")
+                
+                # --- FIX BUG: CLÉ UNIQUE POUR PLOTLY ---
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=f"radar_{idx}_{unique_expander_key}")
             
-            # SKILLS TAGS
+            # SKILLS
             st.markdown("#### Compétences")
             skills_html = ""
             for sk in d['competences']['match']:
@@ -375,7 +359,7 @@ else:
             
             st.divider()
 
-            # SECTION CHALLENGE
+            # CHALLENGE QUESTIONS
             st.markdown("#### 🎯 Challenge & Entretien")
             
             q_col1, q_col2 = st.columns(2)
