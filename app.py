@@ -12,7 +12,7 @@ import io
 import time
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="AI Recruiter PRO - V8.0", layout="wide", page_icon="👔")
+st.set_page_config(page_title="AI Recruiter PRO - V8.1", layout="wide", page_icon="👔")
 
 # CSS optimisé
 st.markdown("""
@@ -30,7 +30,8 @@ st.markdown("""
 def get_ai_client():
     try:
         return openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=st.secrets["GROQ_API_KEY"])
-    except: return None
+    except: 
+        return None
 
 def safe_json_parse(response_text):
     """Parse JSON avec fallback sécurisé"""
@@ -55,20 +56,23 @@ def save_to_sheets(data, job_desc):
             infos.get('email'), infos.get('linkedin', ''), 
             job_desc[:50]
         ])
-    except: pass
+    except: 
+        pass
 
 @st.cache_data
 def extract_pdf_text(file_bytes):
     try:
         reader = PdfReader(io.BytesIO(file_bytes))
         return "".join(page.extract_text() for page in reader.pages if page.extract_text())
-    except: return ""
+    except: 
+        return ""
 
 # --- PROMPT IA OPTIMISÉ ---
 @st.cache_data(ttl=1800)
 def analyze_cv(job_desc, cv_text, criteria=""):
     client = get_ai_client()
-    if not client: return None
+    if not client: 
+        return None
     
     prompt = f"""ANALYSE RECRUTEMENT TECHNIQUE
 
@@ -96,15 +100,16 @@ EXTRAIS et ANALYSE en JSON STRICT:
             max_tokens=2000
         )
         return safe_json_parse(response.choices[0].message.content)
-    except: return None
+    except: 
+        return None
 
 # --- INTERFACE PRINCIPALE ---
 if 'results' not in st.session_state:
     st.session_state.results = []
 
-st.title("👔 AI Recruiter PRO - V8.0")
+st.title("👔 AI Recruiter PRO - V8.1 ✅")
 
-# SIDEBAR ENRICHIE
+# SIDEBAR ENRICHIE (SYNTAXE CORRIGÉE)
 with st.sidebar:
     st.header("📋 Configuration")
     
@@ -123,9 +128,16 @@ with st.sidebar:
     cvs = st.file_uploader("📋 CVs (PDFs)", type='pdf', accept_multiple_files=True)
     
     st.divider()
+    
+    # BOUTONS CORRIGÉS (syntaxe parfaite)
     col1, col2 = st.columns(2)
-    with col1: if st.button("🔄 Analyser", type="primary"): st.session_state.analyze = True
-    with col2: if st.button("🗑️ Reset"): st.session_state.results = []; st.rerun()
+    with col1:
+        if st.button("🔄 Analyser", type="primary"):
+            st.session_state.analyze = True
+    with col2:
+        if st.button("🗑️ Reset"):
+            st.session_state.results = []
+            st.rerun()
     
     # Stats sidebar
     if st.session_state.results:
@@ -266,19 +278,6 @@ if st.session_state.results:
                     st.markdown("**❌ Manque**")
                     for skill in missing:
                         st.markdown(f"❌ {skill}")
-    
-    # Questions (top candidats)
-    top_candidates = df_filtered.head(3)
-    if not top_candidates.empty:
-        st.markdown("---")
-        st.subheader("🎤 Questions pour Top Candidats")
-        for _, cand in top_candidates.iterrows():
-            questions = cand['data'].get('questions', [])
-            if questions:
-                st.markdown(f"**{cand['nom']}** ({cand['score']}%)")
-                for q in questions[:2]:
-                    with st.expander(q.get('question', 'N/A')):
-                        st.caption(f"💡 Attendu: {q.get('attendu', 'N/A')}")
 
 else:
     st.info("👈 **Chargez l'offre + CVs** pour lancer l'analyse")
