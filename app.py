@@ -45,7 +45,7 @@ st.markdown("""
     [data-testid="stSidebar"] * { color: var(--text-main); }
     [data-testid="stSidebar"] label, [data-testid="stSidebar"] p { color: var(--text-sub) !important; }
 
-    /* --- CORRECTIF INPUTS --- */
+    /* CORRECTIF INPUTS */
     .stTextArea textarea, .stTextInput input {
         color: var(--text-main) !important;
         caret-color: var(--primary) !important;
@@ -56,13 +56,13 @@ st.markdown("""
     .stTextArea textarea:focus, .stTextInput input:focus { border-color: var(--primary) !important; box-shadow: 0 0 0 1px var(--primary) !important; }
     .stTextArea label, .stTextInput label { color: var(--text-sub) !important; font-weight: 500 !important; }
 
-    /* --- CORRECTIF UPLOADERS --- */
+    /* CORRECTIF UPLOADERS */
     [data-testid="stFileUploader"] section { background-color: #f8fafc !important; border: 1px dashed var(--border) !important; }
     [data-testid="stFileUploader"] section > div, [data-testid="stFileUploader"] section span, [data-testid="stFileUploader"] section small { color: var(--text-sub) !important; }
     [data-testid="stFileUploader"] svg { fill: var(--text-sub) !important; }
     [data-testid="stFileUploader"] button { color: var(--primary) !important; border-color: var(--primary) !important; background-color: white !important; }
 
-    /* --- CORRECTIF EXPANDER --- */
+    /* CORRECTIF EXPANDER */
     div[data-testid="stExpander"] {
         background: white; border: 1px solid var(--border); border-radius: 8px; 
         box-shadow: none !important; margin-bottom: 16px;
@@ -76,7 +76,7 @@ st.markdown("""
     .streamlit-expanderHeader:hover { color: var(--primary) !important; }
     .streamlit-expanderHeader svg { fill: var(--text-sub) !important; }
 
-    /* 4. DESIGN ELEMENTS */
+    /* DESIGN ELEMENTS */
     .kpi-card { background: white; padding: 20px; border: 1px solid var(--border); border-radius: 8px; text-align: center; height: 100%; }
     .kpi-val { font-size: 1.6rem; font-weight: 700; color: var(--primary); margin-bottom: 5px; }
     .kpi-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
@@ -159,16 +159,20 @@ def get_client():
     except: return None
 
 def extract_pdf(file):
-    try: return "\n".join([p.extract_text() for p in PdfReader(io.BytesIO(file)).pages if p.extract_text()])
+    try: 
+        # On utilise BytesIO directement sur le contenu
+        return "\n".join([p.extract_text() for p in PdfReader(io.BytesIO(file)).pages if p.extract_text()])
     except: return ""
 
-@st.cache_data(ttl=3600)
-def analyze_candidate(job, cv, criteria=""):
+# --- CORRECTIF : PLUS DE CACHE ICI POUR EVITER LES DUPLICATAS ---
+def analyze_candidate(job, cv, criteria="", file_name="unknown"):
     client = get_client()
     if not client: return None
     
+    # On intègre le nom du fichier dans le prompt pour garantir l'unicité
     prompt = f"""
     ROLE: Expert Recrutement & Chasseur de Têtes.
+    FICHIER: {file_name}
     OFFRE: {job[:1500]}
     CRITERES: {criteria}
     CV: {cv[:3000]}
@@ -228,9 +232,13 @@ if launch_btn and job_text and cv_files:
     res = []
     prog = st.progress(0)
     for i, f in enumerate(cv_files):
-        txt = extract_pdf(f.getvalue())
-        if txt:
-            d = analyze_candidate(job_text, txt, criteria)
+        # Reset du pointeur de fichier pour être sûr de bien lire
+        f.seek(0) 
+        txt = extract_pdf(f.read())
+        
+        if txt and len(txt) > 50: # Vérification contenu minimum
+            # On passe le nom du fichier pour unicité
+            d = analyze_candidate(job_text, txt, criteria, file_name=f.name)
             if d: 
                 save_to_sheets(d, job_text)
                 res.append(d)
@@ -271,7 +279,7 @@ else:
         i = d['infos']
         s = d['scores']
         
-        # --- CORRECTIF : EXPANDER AVEC KEY UNIQUE POUR ÉVITER LE BUG PLOTLY ---
+        # KEY UNIQUE SUR L'EXPANDER AUSSI
         with st.expander(f"{i['nom']}  —  {s['global']}%", expanded=(idx==0)):
             
             # HEADER
@@ -353,7 +361,7 @@ else:
                     showlegend=False, margin=dict(t=20, b=20, l=30, r=30), height=220,
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
                 )
-                # --- KEY UNIQUE AJOUTÉE ICI ---
+                # KEY UNIQUE AJOUTÉE POUR EVITER LE BUG
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=f"radar_{idx}")
             
             # SKILLS TAGS
@@ -367,7 +375,7 @@ else:
             
             st.divider()
 
-            # --- NOUVELLE SECTION QUESTIONS CHALLENGE ---
+            # SECTION CHALLENGE
             st.markdown("#### 🎯 Challenge & Entretien")
             
             q_col1, q_col2 = st.columns(2)
