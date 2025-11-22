@@ -11,31 +11,49 @@ import io
 import re
 import time
 
-# --- 0. CONFIGURATION PAGE & CSS AVANCÉ ---
+# --- 0. CONFIGURATION PAGE ---
 st.set_page_config(page_title="AI Recruiter Maestro", layout="wide", page_icon="✨")
 
-# Le CSS est le cœur de l'amélioration UI
+# --- CSS CORRIGÉ (CONTRASTE FORCÉ) ---
 st.markdown("""
 <style>
-    /* Import Font moderne */
+    /* Import Font */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
     
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-        background-color: #f8f9fc; /* Fond très léger bleuté */
+    /* 1. FORCER LE THÈME CLAIR GLOBAL */
+    .stApp {
+        background-color: #f8f9fc !important;
+        color: #1f2937 !important; /* Texte gris foncé forcé */
+        font-family: 'Inter', sans-serif !important;
     }
 
-    /* CARD STYLE GLOBAL */
-    .stExpander {
+    /* 2. CORRECTION DES TEXTES INVISIBLES DANS LES EXPANDERS */
+    div[data-testid="stExpander"] {
+        background-color: white !important;
         border: none !important;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         border-radius: 16px !important;
-        background-color: white !important;
-        margin-bottom: 20px;
-        overflow: hidden;
+        color: #1f2937 !important; /* Force le texte en noir */
     }
     
-    /* HEADER DU CANDIDAT (Bannière) */
+    /* Force la couleur noire pour tous les paragraphes et spans dans l'app */
+    p, span, div, li {
+        color: #374151; /* Gris foncé lisible */
+    }
+    
+    /* Titres en noir profond */
+    h1, h2, h3, h4, h5, h6 {
+        color: #111827 !important;
+    }
+    
+    /* Correction spécifique pour les st.caption qui deviennent illisibles */
+    .stCaption {
+        color: #6b7280 !important;
+    }
+
+    /* --- RESTE DU DESIGN SYSTEM (Identique V11) --- */
+    
+    /* HEADER DU CANDIDAT */
     .candidate-header {
         display: flex;
         align-items: center;
@@ -55,7 +73,7 @@ st.markdown("""
         width: 50px;
         height: 50px;
         background: linear-gradient(135deg, #6366f1, #8b5cf6);
-        color: white;
+        color: white !important; /* Texte blanc sur fond violet OK */
         border-radius: 50%;
         display: flex;
         align-items: center;
@@ -63,21 +81,8 @@ st.markdown("""
         font-weight: bold;
         font-size: 1.2rem;
     }
-    
-    .candidate-info h3 {
-        margin: 0;
-        color: #1f2937;
-        font-weight: 800;
-        font-size: 1.3rem;
-    }
-    
-    .candidate-info p {
-        margin: 0;
-        color: #6b7280;
-        font-size: 0.9rem;
-    }
 
-    /* SCORE BADGE MODERNE */
+    /* SCORE BADGE */
     .score-ring {
         width: 60px;
         height: 60px;
@@ -87,7 +92,7 @@ st.markdown("""
         justify-content: center;
         font-weight: 900;
         font-size: 1.2rem;
-        color: white;
+        color: white !important;
         box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
     .score-green { background: #10b981; border: 3px solid #d1fae5; }
@@ -100,7 +105,7 @@ st.markdown("""
         border-left: 4px solid #3b82f6;
         padding: 15px;
         border-radius: 0 8px 8px 0;
-        color: #1e3a8a;
+        color: #1e3a8a !important; /* Bleu foncé forcé */
         font-size: 0.95rem;
         margin-bottom: 20px;
     }
@@ -113,7 +118,7 @@ st.markdown("""
         padding: 6px 12px;
         background-color: #f3f4f6;
         border-radius: 20px;
-        color: #374151;
+        color: #374151 !important;
         font-size: 0.85rem;
         margin-right: 8px;
         margin-bottom: 8px;
@@ -129,9 +134,9 @@ st.markdown("""
         font-weight: 600;
         margin: 2px;
     }
-    .tag-expert { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-    .tag-mid { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
-    .tag-miss { background: #fee2e2; color: #991b1b; text-decoration: line-through; opacity: 0.7; }
+    .tag-expert { background: #dcfce7; color: #166534 !important; border: 1px solid #bbf7d0; }
+    .tag-mid { background: #e0e7ff; color: #3730a3 !important; border: 1px solid #c7d2fe; }
+    .tag-miss { background: #fee2e2; color: #991b1b !important; text-decoration: line-through; opacity: 0.7; }
 
     /* SALAIRE WIDGET */
     .salary-widget {
@@ -149,8 +154,8 @@ st.markdown("""
         top: 0; left: 0; width: 100%; height: 4px;
         background: linear-gradient(90deg, #10b981, #3b82f6);
     }
-    .salary-value { font-size: 1.4rem; font-weight: 800; color: #111827; }
-    .salary-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #9ca3af; margin-top: 5px; }
+    .salary-value { font-size: 1.4rem; font-weight: 800; color: #111827 !important; }
+    .salary-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #9ca3af !important; margin-top: 5px; }
 
     /* KPI TOP BAR */
     .kpi-container {
@@ -166,13 +171,13 @@ st.markdown("""
         box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         border-left: 4px solid #8b5cf6;
     }
-    .kpi-label { color: #6b7280; font-size: 0.9rem; }
-    .kpi-val { color: #1f2937; font-size: 1.8rem; font-weight: 800; }
+    .kpi-label { color: #6b7280 !important; font-size: 0.9rem; }
+    .kpi-val { color: #1f2937 !important; font-size: 1.8rem; font-weight: 800; }
 
 </style>
 """, unsafe_allow_html=True)
 
-# --- 1. LOGIQUE MÉTIER (V10 Secured) ---
+# --- 1. LOGIQUE MÉTIER ---
 DEFAULT_DATA = {
     "infos": {"nom": "Candidat", "email": "", "tel": "", "ville": "", "linkedin": "", "poste_actuel": ""},
     "scores": {"global": 0, "tech": 0, "experience": 0, "soft": 0, "fit": 0},
@@ -186,7 +191,7 @@ DEFAULT_DATA = {
 def normalize_json(raw):
     if not isinstance(raw, dict): raw = {}
     data = DEFAULT_DATA.copy()
-    # Mapping sécurisé
+    
     ri = raw.get('infos', {})
     data['infos'] = {k: str(ri.get(k, DEFAULT_DATA['infos'][k])) for k in DEFAULT_DATA['infos']}
     
@@ -268,7 +273,7 @@ def save_to_sheets(data, job_desc):
 
 if 'results' not in st.session_state: st.session_state.results = []
 
-# Sidebar Clean
+# Sidebar
 with st.sidebar:
     st.markdown("### ⚙️ Configuration")
     ao_file = st.file_uploader("1. Offre d'emploi (PDF)", type='pdf')
@@ -314,7 +319,7 @@ if st.session_state.get('analyze', False):
 # DASHBOARD VIEW
 if st.session_state.results:
     
-    # 1. KPI ROW
+    # KPI
     df = pd.DataFrame([r['scores']['global'] for r in st.session_state.results], columns=['Score'])
     avg_score = int(df['Score'].mean())
     top_score = int(df['Score'].max())
@@ -337,21 +342,20 @@ if st.session_state.results:
     </div>
     """, unsafe_allow_html=True)
 
-    # Tri des résultats
     sorted_results = sorted(st.session_state.results, key=lambda x: x['scores']['global'], reverse=True)
 
-    # 2. CANDIDATE FEED
+    # FEED
     for idx, d in enumerate(sorted_results):
         i = d['infos']
         s = d['scores']
         
-        # Logique Couleur & Avatar
         score_color = "score-green" if s['global'] >= 75 else "score-orange" if s['global'] >= 50 else "score-red"
         initials = "".join([n[0] for n in i['nom'].split()[:2]]).upper()
         
+        # EXPANDER AVEC FOND BLANC FORCÉ
         with st.expander(f"{i['nom']}  •  {s['global']}%", expanded=(idx == 0)):
             
-            # --- HEADER PERSONNALISÉ (HTML/CSS) ---
+            # Header HTML
             st.markdown(f"""
             <div class="candidate-header">
                 <div class="candidate-profile">
@@ -367,7 +371,7 @@ if st.session_state.results:
             </div>
             """, unsafe_allow_html=True)
             
-            # --- CONTACT BAR ---
+            # Contact Bar HTML
             linkedin_link = f'<a href="{i["linkedin"]}" target="_blank" style="text-decoration:none;">🔗 LinkedIn</a>' if i['linkedin'] else '<span style="color:#ccc">🔗 No LinkedIn</span>'
             st.markdown(f"""
             <div style="margin-bottom: 20px;">
@@ -377,25 +381,25 @@ if st.session_state.results:
             </div>
             """, unsafe_allow_html=True)
             
-            # --- GRID LAYOUT (2/3 GAUCHE, 1/3 DROITE) ---
+            # Grid Layout
             col_main, col_side = st.columns([2, 1])
             
             with col_main:
                 # Verdict
                 st.markdown(f"""<div class="verdict-container"><b>💡 L'avis de l'IA :</b> {d['analyse']['verdict']}</div>""", unsafe_allow_html=True)
                 
-                # Balance (Forces/Faiblesses)
+                # Forces / Faiblesses
                 c1, c2 = st.columns(2)
                 with c1:
-                    st.caption("✅ POINTS FORTS")
+                    st.markdown("**✅ POINTS FORTS**")
                     for f in d['analyse']['points_forts'][:3]: st.markdown(f"• {f}")
                 with c2:
-                    st.caption("⚠️ VIGILANCE")
+                    st.markdown("**⚠️ VIGILANCE**")
                     for f in d['analyse']['points_faibles'][:3]: st.markdown(f"• {f}")
                 
                 st.markdown("---")
                 
-                # Historique (Timeline simplifiée)
+                # Historique
                 st.markdown("##### 📅 Expérience Récente")
                 if d['historique']:
                     for h in d['historique'][:2]:
@@ -405,7 +409,7 @@ if st.session_state.results:
                     st.info("Historique non détecté.")
 
             with col_side:
-                # Widget Salaire
+                # Salaire HTML
                 sal = d['salaire']
                 st.markdown(f"""
                 <div class="salary-widget">
@@ -416,7 +420,7 @@ if st.session_state.results:
                 <br>
                 """, unsafe_allow_html=True)
                 
-                # Skills Tags
+                # Tags HTML
                 st.caption("🛠️ COMPÉTENCES CLÉS")
                 tags_html = ""
                 for sk in d['competences']['match'][:5]:
@@ -425,7 +429,7 @@ if st.session_state.results:
                     tags_html += f'<span class="tag tag-miss">{sk}</span>'
                 st.markdown(tags_html, unsafe_allow_html=True)
                 
-                # Radar Chart Minimaliste
+                # Radar
                 fig = go.Figure(data=go.Scatterpolar(
                     r=[s['tech'], s['experience'], s['soft'], s['fit']],
                     theta=['Tech', 'Exp', 'Soft', 'Fit'],
@@ -440,14 +444,13 @@ if st.session_state.results:
                 )
                 st.plotly_chart(fig, use_container_width=True, key=f"radar_{idx}")
 
-            # --- FOOTER (Guide Entretien) ---
+            # Footer (Entretien)
             with st.expander("🎤 Voir le Guide d'Entretien"):
                 for q in d['entretien']:
                     st.markdown(f"**Q ({q.get('theme','Gen')}):** {q.get('question')}")
                     st.info(f"🎯 Attendu: {q.get('attendu')}")
 
 else:
-    # Empty State Joli
     st.markdown("""
     <div style="text-align: center; padding: 50px; color: #9ca3af;">
         <h3>👋 Prêt à recruter ?</h3>
