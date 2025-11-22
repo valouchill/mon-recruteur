@@ -18,24 +18,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS FLAT & HARMONISÉ (CORRECTIF TEXT AREAS) ---
+# --- CSS FLAT & HARMONISÉ (CORRECTIF EXPANDER + QUESTIONS) ---
 st.markdown("""
 <style>
     /* IMPORT FONT INTER */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-    /* 1. VARIABLES COULEURS (PALETTE INDIGO MONOCHROME) */
+    /* 1. VARIABLES COULEURS */
     :root {
         --primary: #4f46e5;       /* Indigo 600 */
         --primary-light: #e0e7ff; /* Indigo 100 */
-        --text-main: #312e81;     /* Indigo 900 (Texte principal) */
-        --text-sub: #64748b;      /* Slate 500 (Texte secondaire) */
+        --text-main: #312e81;     /* Indigo 900 */
+        --text-sub: #64748b;      /* Slate 500 */
         --bg-app: #f8fafc;        /* Slate 50 */
         --border: #cbd5e1;        /* Slate 300 */
         --card-bg: #ffffff;
-        
-        --success-bg: #dcfce7; --success-text: #14532d;
-        --warning-bg: #fee2e2; --warning-text: #7f1d1d;
     }
 
     /* 2. RESET GLOBAL */
@@ -43,110 +40,91 @@ st.markdown("""
     h1, h2, h3, h4, .stMarkdown { color: var(--text-main) !important; font-family: 'Inter', sans-serif; }
     p, li, label, .stCaption { color: var(--text-sub) !important; }
     
-    /* 3. SIDEBAR CLEAN */
+    /* 3. SIDEBAR */
     [data-testid="stSidebar"] { background-color: white; border-right: 1px solid var(--border); }
     [data-testid="stSidebar"] * { color: var(--text-main); }
-    
-    /* Force la couleur des labels dans la sidebar */
-    [data-testid="stSidebar"] label, [data-testid="stSidebar"] p { 
-        color: var(--text-sub) !important; 
-    }
+    [data-testid="stSidebar"] label, [data-testid="stSidebar"] p { color: var(--text-sub) !important; }
 
-    /* --- CORRECTIF INPUTS & TEXT AREAS --- */
-    /* Cible les zones de texte ("Ou texte offre", "Critères") */
+    /* --- CORRECTIF INPUTS --- */
     .stTextArea textarea, .stTextInput input {
-        color: var(--text-main) !important; /* Texte saisi en Indigo foncé */
-        caret-color: var(--primary) !important; /* Curseur de saisie */
+        color: var(--text-main) !important;
+        caret-color: var(--primary) !important;
         background-color: #f8fafc !important;
         border: 1px solid var(--border) !important;
     }
-    
-    /* Couleur du texte "placeholder" (gris clair quand vide) */
-    .stTextArea textarea::placeholder, .stTextInput input::placeholder {
-        color: #94a3b8 !important; /* Slate 400 */
-    }
-    
-    /* Couleur des labels au-dessus des inputs */
-    .stTextArea label, .stTextInput label {
-        color: var(--text-sub) !important;
-        font-weight: 500 !important;
-    }
-    
-    /* Focus (quand on clique dedans) */
-    .stTextArea textarea:focus, .stTextInput input:focus {
-        border-color: var(--primary) !important;
-        box-shadow: 0 0 0 1px var(--primary) !important;
-    }
+    .stTextArea textarea::placeholder, .stTextInput input::placeholder { color: #94a3b8 !important; }
+    .stTextArea textarea:focus, .stTextInput input:focus { border-color: var(--primary) !important; box-shadow: 0 0 0 1px var(--primary) !important; }
+    .stTextArea label, .stTextInput label { color: var(--text-sub) !important; font-weight: 500 !important; }
 
-    /* --- CORRECTIF UPLOADERS (DROPZONES) --- */
-    [data-testid="stFileUploader"] section {
-        background-color: #f8fafc !important;
-        border: 1px dashed var(--border) !important;
-    }
-    [data-testid="stFileUploader"] section > div, 
-    [data-testid="stFileUploader"] section span, 
-    [data-testid="stFileUploader"] section small {
-        color: var(--text-sub) !important; 
-    }
-    [data-testid="stFileUploader"] svg {
-        fill: var(--text-sub) !important;
-        color: var(--text-sub) !important;
-    }
-    [data-testid="stFileUploader"] button {
-        color: var(--primary) !important;
-        border-color: var(--primary) !important;
-        background-color: white !important;
-        font-weight: 500;
-    }
+    /* --- CORRECTIF UPLOADERS --- */
+    [data-testid="stFileUploader"] section { background-color: #f8fafc !important; border: 1px dashed var(--border) !important; }
+    [data-testid="stFileUploader"] section > div, [data-testid="stFileUploader"] section span, [data-testid="stFileUploader"] section small { color: var(--text-sub) !important; }
+    [data-testid="stFileUploader"] svg { fill: var(--text-sub) !important; }
+    [data-testid="stFileUploader"] button { color: var(--primary) !important; border-color: var(--primary) !important; background-color: white !important; }
 
-    /* 4. KPI CARDS */
-    .kpi-card {
-        background: white; padding: 20px; border: 1px solid var(--border); 
-        border-radius: 8px; text-align: center; height: 100%;
-    }
-    .kpi-val { font-size: 1.6rem; font-weight: 700; color: var(--primary); margin-bottom: 5px; }
-    .kpi-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
-
-    /* 5. CARTES CANDIDATS */
+    /* --- CORRECTIF EXPANDER (BOUTON DEPLIABLE) --- */
+    /* Force le fond blanc et le texte indigo même quand actif/focus */
     div[data-testid="stExpander"] {
         background: white; border: 1px solid var(--border); border-radius: 8px; 
         box-shadow: none !important; margin-bottom: 16px;
     }
-    .streamlit-expanderHeader { background-color: white; color: var(--text-main); font-weight: 600; border-bottom: 1px solid #f1f5f9; }
+    .streamlit-expanderHeader { 
+        background-color: white !important; 
+        color: var(--text-main) !important; 
+        font-weight: 600; 
+        border-bottom: 1px solid #f1f5f9; 
+    }
+    .streamlit-expanderHeader:hover {
+        color: var(--primary) !important;
+    }
+    /* Cible l'icône flèche pour qu'elle ne soit pas noire */
+    .streamlit-expanderHeader svg {
+        fill: var(--text-sub) !important;
+    }
 
-    /* 6. HEADER CANDIDAT */
+    /* 4. DESIGN ELEMENTS */
+    .kpi-card { background: white; padding: 20px; border: 1px solid var(--border); border-radius: 8px; text-align: center; height: 100%; }
+    .kpi-val { font-size: 1.6rem; font-weight: 700; color: var(--primary); margin-bottom: 5px; }
+    .kpi-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+
     .header-row { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 15px; border-bottom: 1px solid #f1f5f9; margin-bottom: 20px; }
     .c-name { font-size: 1.3rem; font-weight: 700; color: var(--text-main); margin: 0; }
     .c-job { font-size: 0.95rem; color: var(--text-sub); margin-top: 2px; }
     
     .score-box { background: var(--primary); color: white; padding: 8px 16px; border-radius: 6px; font-weight: 700; font-size: 1rem; }
-
-    /* 7. PILLS */
     .pill { background: #f1f5f9; border: 1px solid #e2e8f0; color: var(--text-main); padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; margin-top: 8px; }
     .pill a { color: var(--primary) !important; text-decoration: none; font-weight: 600; }
 
-    /* 8. BOXES ALIGNÉES */
     .analysis-container { border: 1px solid var(--border); background-color: #f8fafc; border-radius: 6px; padding: 15px; height: 100%; }
     .analysis-title { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-bottom: 10px; display: block; }
+    .list-item { font-size: 0.9rem; margin-bottom: 6px; display: block; color: var(--text-main); }
     .txt-success { color: #15803d; }
     .txt-danger { color: #b91c1c; }
-    .list-item { font-size: 0.9rem; margin-bottom: 6px; display: block; color: var(--text-main); }
 
-    /* 9. VERDICT */
     .verdict { background: var(--primary-light); color: var(--text-main); padding: 15px; border-radius: 6px; font-weight: 500; font-size: 0.95rem; line-height: 1.5; border: 1px solid #c7d2fe; margin-bottom: 20px; }
 
-    /* 10. TIMELINE */
     .tl-item { border-left: 2px solid var(--border); padding-left: 15px; margin-bottom: 20px; padding-bottom: 5px; }
     .tl-title { font-weight: 700; color: var(--text-main); font-size: 0.95rem; }
     .tl-date { font-size: 0.75rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600; margin-bottom: 5px; display: block;}
     .tl-desc { font-size: 0.9rem; color: var(--text-sub); }
 
-    /* 11. SKILL TAGS */
     .skill-tag { background: white; border: 1px solid var(--border); color: var(--text-main); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 500; display: inline-block; margin: 2px; }
     .skill-tag.match { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
     .skill-tag.missing { background: #fef2f2; border-color: #fecaca; color: #991b1b; text-decoration: line-through; opacity: 0.7;}
     
     .salary-amount { font-size: 1.5rem; font-weight: 700; color: var(--text-main); }
+
+    /* 5. NOUVEAU STYLE QUESTIONS CHALLENGE */
+    .question-box {
+        background-color: #f1f5f9; /* Slate 100 */
+        border-left: 3px solid var(--primary);
+        padding: 12px;
+        margin-bottom: 10px;
+        border-radius: 0 6px 6px 0;
+    }
+    .q-theme { text-transform: uppercase; font-size: 0.7rem; color: var(--primary); font-weight: 700; margin-bottom: 4px; }
+    .q-text { font-weight: 600; color: var(--text-main); font-size: 0.9rem; margin-bottom: 6px; }
+    .q-answer { font-size: 0.85rem; color: var(--text-sub); font-style: italic; }
 
 </style>
 """, unsafe_allow_html=True)
@@ -197,12 +175,13 @@ def analyze_candidate(job, cv, criteria=""):
     if not client: return None
     
     prompt = f"""
-    ROLE: Expert Recrutement.
+    ROLE: Expert Recrutement & Chasseur de Têtes.
     OFFRE: {job[:1500]}
     CRITERES: {criteria}
     CV: {cv[:3000]}
     
-    TACHE: Analyse critique et structurée.
+    TACHE: Analyse critique.
+    IMPORTANT: La section "entretien" doit contenir 3 questions PIÈGES/CHALLENGE spécifiques aux lacunes du candidat par rapport à l'offre. Pas de questions génériques.
     
     JSON STRICT:
     {{
@@ -212,7 +191,7 @@ def analyze_candidate(job, cv, criteria=""):
         "competences": {{ "match": ["Skill A", "Skill B"], "manquant": ["Skill C"] }},
         "analyse": {{ "verdict": "Synthèse objective (2 lignes).", "points_forts": ["Point A", "Point B"], "points_faibles": ["Point C", "Point D"] }},
         "historique": [ {{ "titre": "...", "entreprise": "...", "duree": "...", "resume_synthetique": "Action principale." }} ],
-        "entretien": [ {{ "theme": "...", "question": "...", "attendu": "..." }} ]
+        "entretien": [ {{ "theme": "Hard Skill / Experience Gap", "question": "Question précise pour vérifier une compétence douteuse", "attendu": "Réponse idéale attendue" }} ]
     }}
     """
     try:
@@ -238,23 +217,18 @@ def save_to_sheets(data, job_desc):
 
 # --- 2. INTERFACE ---
 
-# SIDEBAR
 with st.sidebar:
     st.markdown("### ⚙️ Paramètres")
-    
     ao_file = st.file_uploader("1. Offre (PDF)", type='pdf', key="ao")
     ao_text_input = st.text_area("Ou texte offre", height=100)
     job_text = extract_pdf(ao_file.getvalue()) if ao_file else ao_text_input
-    
     criteria = st.text_area("2. Critères spécifiques", height=80)
     cv_files = st.file_uploader("3. CVs Candidats", type='pdf', accept_multiple_files=True)
-    
     launch_btn = st.button("Lancer l'Analyse", type="primary", use_container_width=True)
     if st.button("Reset", use_container_width=True):
         st.session_state.results = []
         st.rerun()
 
-# MAIN
 if 'results' not in st.session_state: st.session_state.results = []
 
 if launch_btn and job_text and cv_files:
@@ -304,6 +278,7 @@ else:
         i = d['infos']
         s = d['scores']
         
+        # Expander (maintenant blanc/indigo)
         with st.expander(f"{i['nom']}  —  {s['global']}%", expanded=(idx==0)):
             
             # HEADER
@@ -347,9 +322,8 @@ else:
             
             st.divider()
             
-            # DETAILS (GAUCHE) & DATA (DROITE)
+            # DETAILS & DATA
             col_g, col_d = st.columns([2, 1])
-            
             with col_g:
                 st.markdown("#### 📅 Parcours")
                 if d['historique']:
@@ -366,7 +340,6 @@ else:
                     st.caption("Non détecté")
 
             with col_d:
-                # SALAIRE FLAT
                 st.markdown(f"""
                 <div style="padding:15px; border:1px solid #e2e8f0; border-radius:8px; text-align:center; margin-bottom:20px; background: white;">
                     <div style="font-size:0.75rem; color:var(--text-sub); text-transform:uppercase; font-weight:600;">Est. Salaire</div>
@@ -375,7 +348,6 @@ else:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # RADAR
                 cat = ['Tech', 'Exp', 'Soft', 'Fit', 'Tech']
                 val = [s['tech'], s['experience'], s['soft'], s['fit'], s['tech']]
                 fig = go.Figure(go.Scatterpolar(
@@ -390,7 +362,7 @@ else:
                 )
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
             
-            # SKILLS FOOTER
+            # SKILLS TAGS
             st.markdown("#### Compétences")
             skills_html = ""
             for sk in d['competences']['match']:
@@ -398,3 +370,21 @@ else:
             for sk in d['competences']['manquant']:
                 skills_html += f"<span class='skill-tag missing'>{sk}</span>"
             st.markdown(skills_html, unsafe_allow_html=True)
+            
+            st.divider()
+
+            # --- NOUVELLE SECTION QUESTIONS CHALLENGE ---
+            st.markdown("#### 🎯 Challenge & Entretien")
+            
+            # Affichage en grille (2 colonnes) pour les questions
+            q_col1, q_col2 = st.columns(2)
+            for i, q in enumerate(d['entretien']):
+                target_col = q_col1 if i % 2 == 0 else q_col2
+                with target_col:
+                    st.markdown(f"""
+                    <div class="question-box">
+                        <div class="q-theme">{q.get('theme', 'Question')}</div>
+                        <div class="q-text">❓ {q.get('question')}</div>
+                        <div class="q-answer">💡 Attendu : {q.get('attendu')}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
