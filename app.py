@@ -13,100 +13,64 @@ import time
 
 # --- 0. CONFIGURATION PAGE ---
 st.set_page_config(
-    page_title="AI Recruiter PRO - V12.1", 
+    page_title="AI Recruiter PRO - V12.2", 
     layout="wide", 
     page_icon="🚀",
     initial_sidebar_state="expanded"
 )
 
-# --- CSS CORRIGÉ (ICÔNES RÉPARÉES) ---
+# --- CSS CORRIGÉ & OPTIMISÉ ---
 st.markdown("""
 <style>
-    /* 1. VARIABLES GLOBALES */
-    :root {
-        --primary-color: #4f46e5;
-        --background-color: #f8f9fc;
-        --text-color: #1f2937;
-        --font: 'Inter', sans-serif;
-    }
-    
-    /* Import Font */
+    /* VARIABLES & FONT */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-
-    /* 2. RESET THÈME CLAIR (SANS CASSER LES ICÔNES) */
-    .stApp {
-        background-color: #f8f9fc !important;
-        color: #1f2937 !important;
-        font-family: 'Inter', sans-serif !important;
-    }
+    :root { --primary: #4f46e5; --bg: #f8f9fc; --text: #1f2937; }
     
-    [data-testid="stSidebar"] {
-        background-color: #ffffff !important;
-        border-right: 1px solid #f0f0f0 !important;
-    }
-
-    /* 3. TEXTES ET COULEURS (Ciblage précis pour ne pas toucher aux icônes) */
-    h1, h2, h3, h4, h5, h6, p, li, .stMarkdown, .stText, label {
-        color: #1f2937 !important;
-    }
+    /* RESET GLOBAL */
+    .stApp { background-color: #f8f9fc !important; color: #1f2937 !important; font-family: 'Inter', sans-serif !important; }
+    [data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #f0f0f0 !important; }
     
-    /* 4. CORRECTIFS WIDGETS */
-    .stTextArea textarea, .stTextInput input {
-        background-color: #ffffff !important;
-        color: #1f2937 !important;
-        border: 1px solid #e5e7eb !important;
-    }
+    /* TEXTE & HEADERS */
+    h1, h2, h3, h4, h5, h6, p, li, .stMarkdown, label, .stText { color: #1f2937 !important; }
+    .stCaption { color: #6b7280 !important; }
     
-    /* 5. STYLE EXPANDER PROPRE */
+    /* INPUTS */
+    .stTextArea textarea, .stTextInput input { background-color: #ffffff !important; color: #1f2937 !important; border: 1px solid #e5e7eb !important; }
+    
+    /* CARTE EXPANDER (Box Shadow douce) */
     div[data-testid="stExpander"] {
         border: none !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
         border-radius: 12px !important;
         background-color: white !important;
-        margin-bottom: 16px !important;
+        margin-bottom: 20px !important;
     }
-    
-    .streamlit-expanderHeader {
-        background-color: white !important;
-        color: #1f2937 !important;
-        font-weight: 600 !important;
-    }
-    
-    .streamlit-expanderContent {
-        border-top: 1px solid #f3f4f6;
-        padding-top: 15px;
-        color: #374151 !important;
-    }
-
-    /* --- DESIGN SYSTEM CUSTOM --- */
+    .streamlit-expanderHeader { background-color: white !important; color: #1f2937 !important; font-weight: 600 !important; }
+    .streamlit-expanderContent { border-top: 1px solid #f3f4f6; padding-top: 20px; color: #374151 !important; }
 
     /* HEADER CANDIDAT */
-    .candidate-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; margin-bottom: 15px; border-bottom: 1px solid #f3f4f6; }
-    .candidate-info h3 { font-size: 1.3rem; font-weight: 800; margin: 0; color: #111827 !important; }
+    .candidate-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; margin-bottom: 15px; border-bottom: 1px solid #f3f4f6; }
+    .candidate-info h3 { font-size: 1.3rem; font-weight: 800; margin: 0; }
     .candidate-info p { color: #6b7280 !important; margin: 0; font-size: 0.9rem; }
-    
-    /* SCORE RING */
-    .score-ring { width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white !important; font-size: 1rem; }
-    .bg-green { background: #10b981; border: 3px solid #d1fae5; }
-    .bg-orange { background: #f59e0b; border: 3px solid #fde68a; }
-    .bg-red { background: #ef4444; border: 3px solid #fecaca; }
+    .score-ring { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white !important; font-size: 1rem; }
+    .bg-green { background: #10b981; } .bg-orange { background: #f59e0b; } .bg-red { background: #ef4444; }
 
     /* CONTACT PILLS */
-    .pill { display: inline-flex; align-items: center; padding: 4px 10px; background: #f3f4f6; border-radius: 20px; font-size: 0.8rem; color: #4b5563 !important; margin-right: 6px; border: 1px solid #e5e7eb; }
+    .pill { display: inline-flex; align-items: center; padding: 4px 10px; background: #f9fafb; border-radius: 20px; font-size: 0.8rem; color: #4b5563 !important; margin-right: 6px; border: 1px solid #e5e7eb; font-weight: 500; }
 
-    /* TIMELINE */
-    .timeline-item { position: relative; padding-left: 20px; margin-bottom: 15px; border-left: 2px solid #e5e7eb; }
+    /* TIMELINE (Historique) */
+    .timeline-item { position: relative; padding-left: 24px; margin-bottom: 20px; border-left: 2px solid #e5e7eb; }
     .timeline-item:last-child { border-left: 2px solid transparent; }
-    .timeline-dot { position: absolute; left: -6px; top: 0; width: 10px; height: 10px; border-radius: 50%; background: #4f46e5; }
-    .timeline-title { font-weight: 700; font-size: 0.9rem; color: #1f2937 !important; }
-    .timeline-date { font-size: 0.75rem; color: #6b7280 !important; text-transform: uppercase; margin-bottom: 2px; }
-    .timeline-desc { font-size: 0.85rem; color: #4b5563 !important; background: #f9fafb; padding: 8px; border-radius: 6px; margin-top: 4px; font-style: italic; }
+    .timeline-dot { position: absolute; left: -6px; top: 0; width: 10px; height: 10px; border-radius: 50%; background: #4f46e5; border: 2px solid white; box-shadow: 0 0 0 2px #e0e7ff; }
+    .timeline-title { font-weight: 700; font-size: 0.95rem; color: #1f2937 !important; }
+    .timeline-date { font-size: 0.75rem; color: #6b7280 !important; text-transform: uppercase; margin-bottom: 4px; font-weight: 600; }
+    .timeline-desc { font-size: 0.9rem; color: #4b5563 !important; background: #f8f9fc; padding: 10px; border-radius: 8px; margin-top: 6px; line-height: 1.5; border: 1px solid #f3f4f6; }
 
     /* VERDICT & SALAIRE */
-    .verdict-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px; color: #1e40af !important; border-radius: 0 8px 8px 0; margin-bottom: 15px; font-size: 0.9rem; }
-    .salary-box { text-align: center; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px; margin-bottom: 15px; }
-    .salary-val { font-weight: 800; font-size: 1.1rem; color: #111827 !important; }
-    .salary-lbl { font-size: 0.7rem; color: #9ca3af !important; text-transform: uppercase; }
+    .verdict-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; color: #1e40af !important; border-radius: 0 8px 8px 0; margin-bottom: 20px; font-size: 0.95rem; }
+    .salary-box { text-align: center; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 15px; margin-bottom: 20px; }
+    .salary-val { font-weight: 800; font-size: 1.2rem; color: #111827 !important; }
+    .salary-lbl { font-size: 0.7rem; color: #9ca3af !important; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; }
 
 </style>
 """, unsafe_allow_html=True)
@@ -181,7 +145,7 @@ def analyze_candidate(job, cv, criteria=""):
     - CV: {cv[:3500]}
     
     INSTRUCTION HISTORIQUE :
-    Pour les 2 dernières expériences, crée un champ "resume_synthetique" (2 lignes MAX) focalisé sur l'impact.
+    Pour les 2 dernières expériences, rédige un champ "resume_synthetique" (2 lignes MAX) focalisé sur l'impact et la tech.
     
     JSON STRICT:
     {{
@@ -227,13 +191,14 @@ with st.sidebar:
     criteria = st.text_area("Critères", height=80)
     st.divider()
     cv_files = st.file_uploader("2. CVs (PDF)", type='pdf', accept_multiple_files=True)
+    
     if st.button("🚀 Analyser", type="primary", use_container_width=True):
         if job_text and cv_files: st.session_state.analyze = True
     if st.button("🗑️ Reset", use_container_width=True):
         st.session_state.results = []
         st.rerun()
 
-st.markdown("<h2 style='text-align:center; color:#4f46e5 !important;'>AI Recruiter PRO V12.1</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align:center; color:#4f46e5 !important; margin-bottom: 40px;'>AI Recruiter PRO V12.2</h2>", unsafe_allow_html=True)
 
 if st.session_state.get('analyze', False):
     st.session_state.analyze = False
@@ -277,12 +242,13 @@ if st.session_state.results:
             </div>
             """, unsafe_allow_html=True)
             
-            # GRID
             c_main, c_side = st.columns([2, 1])
             
             with c_main:
+                # VERDICT
                 st.markdown(f"""<div class="verdict-box"><b>💡 Analyse :</b> {d['analyse']['verdict']}</div>""", unsafe_allow_html=True)
                 
+                # FORCES / FAIBLESSES
                 c1, c2 = st.columns(2)
                 with c1:
                     st.markdown("**✅ Forces**")
@@ -292,6 +258,8 @@ if st.session_state.results:
                     for f in d['analyse']['points_faibles'][:3]: st.markdown(f"<div style='color:#991b1b; margin-bottom:2px;'>! {f}</div>", unsafe_allow_html=True)
                 
                 st.markdown("---")
+                
+                # HISTORIQUE (TIMELINE HTML)
                 st.markdown("##### 📅 Expériences Clés")
                 if d['historique']:
                     timeline_html = '<div class="timeline">'
@@ -310,6 +278,7 @@ if st.session_state.results:
                     st.info("Pas d'historique détecté.")
 
             with c_side:
+                # SALAIRE
                 sal = d['salaire']
                 st.markdown(f"""
                 <div class="salary-box">
@@ -319,24 +288,55 @@ if st.session_state.results:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                fig = go.Figure(data=go.Scatterpolar(
-                    r=[s['tech'], s['experience'], s['soft'], s['fit']],
-                    theta=['Tech', 'Exp', 'Soft', 'Fit'],
+                # --- RADAR CHART IMPROVED (Design Glass & Bold) ---
+                
+                # On ferme la boucle du radar en répétant le 1er point
+                r_vals = [s['tech'], s['experience'], s['soft'], s['fit'], s['tech']]
+                theta_vals = ['Tech', 'Exp', 'Soft', 'Fit', 'Tech']
+                
+                fig = go.Figure()
+                fig.add_trace(go.Scatterpolar(
+                    r=r_vals,
+                    theta=theta_vals,
                     fill='toself',
-                    line_color='#4f46e5'
+                    name=i['nom'],
+                    line=dict(color='#4f46e5', width=2),
+                    fillcolor='rgba(79, 70, 229, 0.2)', # Transparence
+                    hoverinfo='text',
+                    text=[f"{val}%" for val in r_vals]
                 ))
+                
                 fig.update_layout(
-                    height=200, margin=dict(l=20, r=20, t=20, b=20),
-                    polar=dict(radialaxis=dict(visible=False, range=[0, 100]), bgcolor='white'),
-                    showlegend=False
+                    polar=dict(
+                        bgcolor='rgba(255,255,255,0)',
+                        radialaxis=dict(
+                            visible=True,
+                            range=[0, 100],
+                            showticklabels=False, # Cache les chiffres de l'axe
+                            ticks='',
+                            linecolor='rgba(0,0,0,0)',
+                            gridcolor='#e5e7eb' # Grille subtile
+                        ),
+                        angularaxis=dict(
+                            tickfont=dict(size=11, color='#4b5563', family="Inter, sans-serif", weight="bold"),
+                            linecolor='rgba(0,0,0,0)',
+                            gridcolor='#e5e7eb'
+                        )
+                    ),
+                    showlegend=False,
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    margin=dict(l=30, r=30, t=20, b=20),
+                    height=240
                 )
                 st.plotly_chart(fig, use_container_width=True, key=f"rad_{idx}")
 
+                # SKILLS TAGS
                 st.markdown("**Compétences**")
                 for sk in d['competences']['match'][:4]:
-                    st.markdown(f"<span style='color:#166534; background:#dcfce7; padding:2px 6px; border-radius:4px; font-size:0.75rem; font-weight:600; display:inline-block; margin:2px;'>✓ {sk}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span style='color:#166534; background:#dcfce7; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; display:inline-block; margin:2px; border:1px solid #bbf7d0;'>✓ {sk}</span>", unsafe_allow_html=True)
                 for sk in d['competences']['manquant'][:3]:
-                    st.markdown(f"<span style='color:#991b1b; background:#fee2e2; padding:2px 6px; border-radius:4px; font-size:0.75rem; display:inline-block; margin:2px; text-decoration:line-through;'>{sk}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span style='color:#991b1b; background:#fee2e2; padding:3px 8px; border-radius:12px; font-size:0.75rem; display:inline-block; margin:2px; text-decoration:line-through; border:1px solid #fecaca;'>{sk}</span>", unsafe_allow_html=True)
 
             with st.expander("🎤 Questions d'entretien"):
                 for q in d['entretien']:
