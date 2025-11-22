@@ -3,6 +3,7 @@ import openai
 from pypdf import PdfReader
 import json
 import plotly.graph_objects as go
+import plotly.express as px
 import datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -10,279 +11,275 @@ import pandas as pd
 import io
 import time
 
-# --- 1. CONFIGURATION & CSS PRO ---
-st.set_page_config(page_title="AI Recruiter PRO - V7.1 Stable", layout="wide", page_icon="👔")
+# --- CONFIGURATION ---
+st.set_page_config(page_title="AI Recruiter PRO - V8.0", layout="wide", page_icon="👔")
 
+# CSS optimisé
 st.markdown("""
 <style>
-    /* Style des Headers */
-    h3 { color: #1f2937; font-weight: 700; font-size: 1.2rem; margin-top: 0px; border-bottom: 2px solid #f3f4f6; padding-bottom: 10px; }
-    h4 { color: #4b5563; font-size: 1rem; font-weight: 600; margin-top: 15px; }
-    
-    /* Badges Compétences */
-    .badge-expert { background-color: #d1fae5; color: #065f46; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: 1px solid #a7f3d0; display: inline-block; margin: 2px;}
-    .badge-inter { background-color: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: 1px solid #bfdbfe; display: inline-block; margin: 2px;}
-    .badge-junior { background-color: #f3f4f6; color: #374151; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: 1px solid #e5e7eb; display: inline-block; margin: 2px;}
-    
-    /* Boites d'alertes personnalisées */
-    .box-pro { background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 10px; border-radius: 4px; margin-bottom: 5px; color: #166534; font-size: 0.9rem; }
-    .box-con { background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 10px; border-radius: 4px; margin-bottom: 5px; color: #991b1b; font-size: 0.9rem; }
-    
-    /* Contact Info */
-    .contact-row { background: #fff; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; text-align: center; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-    .contact-item { margin: 0 10px; color: #4b5563; font-size: 0.9rem; }
+.metric-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 10px; text-align: center; }
+.st-expanderHeader { font-weight: 600 !important; }
+.status-green { background: #d4edda; color: #155724; padding: 5px 12px; border-radius: 20px; font-weight: 600; }
+.status-orange { background: #fff3cd; color: #856404; padding: 5px 12px; border-radius: 20px; font-weight: 600; }
+.status-red { background: #f8d7da; color: #721c24; padding: 5px 12px; border-radius: 20px; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. UTILS & SERVICES ---
+# --- UTILITAIRES ROBUSTES ---
+@st.cache_data(ttl=3600)
 def get_ai_client():
     try:
-        if "GROQ_API_KEY" in st.secrets:
-            return openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=st.secrets["GROQ_API_KEY"])
+        return openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=st.secrets["GROQ_API_KEY"])
     except: return None
-    return None
 
-def save_to_google_sheet(data, job_desc):
+def safe_json_parse(response_text):
+    """Parse JSON avec fallback sécurisé"""
     try:
-        if "gcp_service_account" in st.secrets:
-            scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-            creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
-            client = gspread.authorize(creds)
-            sheet = client.open("Recrutement_DB").sheet1
-            infos = data.get('infos', {})
-            scores = data.get('scores', {})
-            sheet.append_row([
-                datetime.datetime.now().strftime("%Y-%m-%d"), 
-                infos.get('nom', 'N/A'), 
-                f"{scores.get('global', 0)}%",
-                infos.get('email', 'N/A'),
-                infos.get('linkedin', 'N/A'),
-                job_desc.split('\n')[0][:50]
-            ])
+        return json.loads(response_text)
+    except:
+        return {
+            "infos": {"nom": "Erreur parsing", "email": "N/A"},
+            "scores": {"global": 0}, "analyse": {"verdict": "Erreur JSON"}
+        }
+
+def save_to_sheets(data, job_desc):
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
+        client = gspread.authorize(creds)
+        sheet = client.open("Recrutement_DB").sheet1
+        infos, scores = data.get('infos', {}), data.get('scores', {})
+        sheet.append_row([
+            datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), 
+            infos.get('nom'), f"{scores.get('global')}%",
+            infos.get('email'), infos.get('linkedin', ''), 
+            job_desc[:50]
+        ])
     except: pass
 
-@st.cache_data(show_spinner=False)
-def extract_text_from_pdf(file_bytes):
+@st.cache_data
+def extract_pdf_text(file_bytes):
     try:
         reader = PdfReader(io.BytesIO(file_bytes))
-        return "".join([page.extract_text() for page in reader.pages if page.extract_text()])
+        return "".join(page.extract_text() for page in reader.pages if page.extract_text())
     except: return ""
 
-# --- 3. IA INTELLIGENTE ---
-@st.cache_data(ttl=3600, show_spinner=False)
-def analyze_candidate_deep(job, cv_text, ponderation):
+# --- PROMPT IA OPTIMISÉ ---
+@st.cache_data(ttl=1800)
+def analyze_cv(job_desc, cv_text, criteria=""):
     client = get_ai_client()
     if not client: return None
     
-    prompt = f"""
-    Tu es un Expert Recrutement.
-    
-    TACHE:
-    1. Extrais Infos + HISTORIQUE DÉTAILLÉ (Derniers postes).
-    2. Analyse Skills avec NIVEAUX (Expert/Intermédiaire/Junior).
-    3. Guide Entretien précis.
-    
-    OFFRE: {job[:2000]}
-    CV: {cv_text[:3500]}
-    
-    JSON ATTENDU (Strict):
-    {{
-        "infos": {{
-            "nom": "Nom", "email": "Email", "tel": "Tel", "ville": "Ville",
-            "linkedin": "URL", "annees_exp": "X ans", "poste_actuel": "Titre"
-        }},
-        "scores": {{ "global": 0-100, "tech": 0-10, "exp": 0-10, "soft": 0-10, "culture": 0-10 }},
-        "market": {{ "min": 45, "max": 55, "txt": "Justif courte" }},
-        "historique": [
-            {{ "titre": "Titre Poste", "entreprise": "Boite", "duree": "2020-2023", "resume": "1 phrase clé" }},
-            {{ "titre": "Titre Poste 2", "entreprise": "Boite", "duree": "2018-2020", "resume": "1 phrase clé" }}
-        ],
-        "skills_detail": {{
-            "expert": ["Skill A", "Skill B"],
-            "intermediaire": ["Skill C"],
-            "junior": ["Skill D"],
-            "manquant": ["Skill E"]
-        }},
-        "analyse": {{
-            "verdict": "Synthèse pro.",
-            "pros": ["Atout 1", "Atout 2"],
-            "cons": ["Risque 1", "Risque 2"]
-        }},
-        "interview": {{
-            "tech": [{{ "q": "Question?", "a": "Réponse" }}],
-            "soft": [{{ "q": "Question?", "a": "Réponse" }}]
-        }}
-    }}
-    """
-    
-    for _ in range(3):
-        try:
-            res = client.chat.completions.create(
-                model="llama-3.3-70b-versatile", 
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"},
-                temperature=0.1
-            )
-            return json.loads(res.choices[0].message.content)
-        except: time.sleep(1)
-    return None
+    prompt = f"""ANALYSE RECRUTEMENT TECHNIQUE
 
-# --- 4. FRONTEND ---
-if 'all_results' not in st.session_state:
-    st.session_state.all_results = []
+OFFRE: {job_desc[:2000]}
+CRITÈRES: {criteria}
+CV: {cv_text[:4000]}
 
-st.title("👔 AI Recruiter PRO - V7.1 Stable")
+EXTRAIS et ANALYSE en JSON STRICT:
+{{
+  "infos": {{"nom": "NOM", "email": "email@ex.com", "tel": "01.xx.xx.xx.xx", "ville": "Paris", "linkedin": "https://linkedin.com/in/...", "experience": "5 ans"}},
+  "scores": {{"global": 85, "tech": 9, "experience": 8, "soft": 7, "culture": 8}},
+  "salaire": {{"min": 45, "max": 55, "justif": "Senior Python Paris"}},
+  "historique": [{{"titre": "Dev Senior", "entreprise": "Société", "duree": "2022-Aujourd'hui", "mission": "Description"}}],
+  "competences": {{"expert": ["Python", "AWS"], "intermediaire": ["Docker"], "manquant": ["Kubernetes"]}},
+  "forces": ["5 ans exp Python", "Projets AWS"],
+  "risques": ["Pas de K8s"],
+  "questions": [{{"type": "tech", "question": "Explique un déploiement AWS", "attendu": "Détails ELB/EC2"}}]
+}}"""
 
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.1-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=2000
+        )
+        return safe_json_parse(response.choices[0].message.content)
+    except: return None
+
+# --- INTERFACE PRINCIPALE ---
+if 'results' not in st.session_state:
+    st.session_state.results = []
+
+st.title("👔 AI Recruiter PRO - V8.0")
+
+# SIDEBAR ENRICHIE
 with st.sidebar:
-    st.header("1. Offre (AO)")
-    uploaded_ao = st.file_uploader("PDF AO", type=['pdf'])
-    ao_txt = st.text_area("Ou texte", height=100)
-    job_desc = extract_text_from_pdf(uploaded_ao.getvalue()) if uploaded_ao else ao_txt
+    st.header("📋 Configuration")
     
-    ponderation_input = st.text_area("Critères", height=70)
+    # AO
+    ao_pdf = st.file_uploader("📄 Offre d'emploi (PDF)", type='pdf')
+    ao_text = st.text_area("Ou texte AO", height=120, placeholder="Collez l'offre...")
+    job_offer = extract_pdf_text(ao_pdf.getvalue()) if ao_pdf else ao_text
+    
     st.divider()
-    st.header("2. Candidats")
-    uploaded_files = st.file_uploader("CVs", type=['pdf'], accept_multiple_files=True)
     
-    if st.button("🗑️ Reset"):
-        st.session_state.all_results = []
+    # Critères
+    criteria = st.text_area("⚖️ Critères prioritaires", height=80, 
+                          placeholder="Ex: Python obligatoire, 3+ ans exp, IDF...")
+    
+    # Upload CVs
+    cvs = st.file_uploader("📋 CVs (PDFs)", type='pdf', accept_multiple_files=True)
+    
+    st.divider()
+    col1, col2 = st.columns(2)
+    with col1: if st.button("🔄 Analyser", type="primary"): st.session_state.analyze = True
+    with col2: if st.button("🗑️ Reset"): st.session_state.results = []; st.rerun()
+    
+    # Stats sidebar
+    if st.session_state.results:
+        df_stats = pd.DataFrame(st.session_state.results)
+        st.metric("Candidats", len(df_stats))
+        st.metric("Meilleur score", f"{df_stats['score'].max()}%")
+
+# LOGIQUE ANALYSE
+if st.session_state.get('analyze', False) and job_offer and cvs:
+    st.session_state.analyze = False
+    with st.spinner(f'Analyse de {len(cvs)} CVs...'):
+        results = []
+        progress = st.progress(0)
+        
+        for i, cv_file in enumerate(cvs):
+            cv_text = extract_pdf_text(cv_file.getvalue())
+            if cv_text:
+                analysis = analyze_cv(job_offer, cv_text, criteria)
+                if analysis:
+                    save_to_sheets(analysis, job_offer)
+                    
+                    # Formatage sécurisé
+                    info = analysis.get('infos', {})
+                    score_data = analysis.get('scores', {'global': 0})
+                    
+                    results.append({
+                        'nom': info.get('nom', 'N/A'),
+                        'score': int(score_data.get('global', 0)),
+                        'email': info.get('email', 'N/A'),
+                        'linkedin': info.get('linkedin', None),
+                        'salaire': f"{analysis.get('salaire', {}).get('min', 0)}-{analysis.get('salaire', {}).get('max', 0)}k€",
+                        'data': analysis
+                    })
+            progress.progress((i+1)/len(cvs))
+        
+        st.session_state.results = results
         st.rerun()
-    launch_btn = st.button("⚡ Analyser")
 
-if launch_btn and job_desc and uploaded_files:
-    st.write(f"Analyse de {len(uploaded_files)} profils...")
-    bar = st.progress(0)
-    batch_res = []
-    for i, file in enumerate(uploaded_files):
-        txt = extract_text_from_pdf(file.getvalue())
-        if txt:
-            d = analyze_candidate_deep(job_desc, txt, ponderation_input)
-            if d:
-                save_to_google_sheet(d, job_desc)
-                
-                # Sécurisation des données avant stockage
-                infos = d.get('infos', {})
-                scores = d.get('scores', {})
-                lnk = infos.get('linkedin', 'N/A')
-                final_lnk = lnk if lnk and 'http' in lnk else None
-                
-                batch_res.append({
-                    'Nom': infos.get('nom', 'Inconnu'),
-                    'Score': scores.get('global', 0),
-                    'Exp': infos.get('annees_exp', 'N/A'),
-                    'LinkedIn': final_lnk,
-                    'full': d
-                })
-        bar.progress((i+1)/len(uploaded_files))
-    st.session_state.all_results = batch_res
-    bar.empty()
-    st.rerun()
-
-# --- 5. AFFICHAGE DASHBOARD ---
-if st.session_state.all_results:
-    df = pd.DataFrame(st.session_state.all_results)
-    df = df.sort_values('Score', ascending=False)
+# AFFICHAGE RÉSULTATS
+if st.session_state.results:
+    df = pd.DataFrame(st.session_state.results)
+    df = df.sort_values('score', ascending=False)
     
-    st.subheader("📋 Liste des Candidats")
+    # FILTRES
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        min_score = st.slider("Score min", 0, 100, 50)
+    with col_f2:
+        status_filter = st.selectbox("Statut", ["Tous", "Top 3", "≥75%", "50-74%", "<50%"])
+    
+    df_filtered = df[df['score'] >= min_score].copy()
+    
+    # EXPORT
+    csv_data = df_filtered.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Excel", csv_data, "recrutement.csv", "text/csv")
+    
+    st.subheader("📊 Tableau de Bord")
     st.dataframe(
-        df.drop(columns=['full']),
+        df_filtered.drop('data', axis=1),
         use_container_width=True,
         hide_index=True,
         column_config={
-            "LinkedIn": st.column_config.LinkColumn("Profil", display_text="Voir"),
-            "Score": st.column_config.ProgressColumn("Match", format="%d%%", min_value=0, max_value=100)
+            "linkedin": st.column_config.LinkColumn("LinkedIn"),
+            "score": st.column_config.ProgressColumn("Score", "%d%%"),
         }
     )
     
-    st.markdown("---")
-    st.subheader("📂 Dossiers Détaillés")
-
-    for idx, row in df.iterrows():
-        d = row['full']
-        infos = d.get('infos', {})
-        scores = d.get('scores', {})
-        market = d.get('market', {}) # Sécurisé ici
-        analyse = d.get('analyse', {})
-        skills = d.get('skills_detail', {})
+    # FICHES CANDIDATS
+    st.subheader("👥 Dossiers Détaillés")
+    for idx, candidate in df_filtered.iterrows():
+        data = candidate['data']
+        score = candidate['score']
         
-        score = scores.get('global', 0)
+        status_class = "status-green" if score >= 75 else "status-orange" if score >= 50 else "status-red"
         
-        # HEADER DU DOSSIER
-        with st.expander(f"👤 {infos.get('nom')} | {infos.get('poste_actuel', 'N/A')} | Score: {score}%", expanded=False):
+        with st.expander(f"👤 **{candidate['nom']}** • {score}% • {candidate['salaire']}", expanded=False):
             
-            # 1. BARRE CONTACT (CORRIGÉE AVEC .get())
-            st.markdown(f"""
-            <div class="contact-row">
-                <span class="contact-item">📧 {infos.get('email', 'N/A')}</span>
-                <span class="contact-item">📱 {infos.get('tel', 'N/A')}</span>
-                <span class="contact-item">📍 {infos.get('ville', 'N/A')}</span>
-                <span class="contact-item">💰 {market.get('min', '?')} - {market.get('max', '?')} k€ (Est.)</span>
-                <span class="contact-item">🔗 <a href="{infos.get('linkedin', '#')}" target="_blank">LinkedIn</a></span>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # LAYOUT GRILLE
-            col_main, col_side = st.columns([2, 1])
-
-            # --- GAUCHE ---
-            with col_main:
-                st.markdown("### 🧠 Analyse & Parcours")
-                st.info(analyse.get('verdict', "Pas de verdict disponible."))
+            # HEADER
+            info = data.get('infos', {})
+            col1, col2, col3 = st.columns([1,1,1])
+            with col1: st.markdown(f"**📧** {info.get('email', 'N/A')}")
+            with col2: st.markdown(f"**📍** {info.get('ville', 'N/A')}")
+            with col3: st.markdown(f"**🔗** {info.get('linkedin', 'N/A')}")
+            
+            # Layout 60/40
+            main_col, side_col = st.columns([3, 2])
+            
+            with main_col:
+                st.markdown("### 🎯 Analyse")
+                st.success(data.get('analyse', {}).get('verdict', 'N/A'))
                 
-                c1, c2 = st.columns(2)
-                with c1:
+                # Forces / Risques
+                forces = data.get('forces', [])
+                risques = data.get('risques', [])
+                
+                c_f, c_r = st.columns(2)
+                with c_f:
                     st.markdown("**✅ Forces**")
-                    for p in analyse.get('pros', []): st.markdown(f"<div class='box-pro'>{p}</div>", unsafe_allow_html=True)
-                with c2:
-                    st.markdown("**🚨 Vigilance**")
-                    for c in analyse.get('cons', []): st.markdown(f"<div class='box-con'>{c}</div>", unsafe_allow_html=True)
-
-                st.markdown("#### 📅 Expérience")
-                if d.get('historique'):
-                    for exp in d['historique']:
-                        st.markdown(f"**{exp.get('titre')}** chez *{exp.get('entreprise')}* ({exp.get('duree')})")
-                        st.caption(f"📝 {exp.get('resume')}")
-                        st.markdown("---")
-                else:
-                    st.warning("Historique non détecté.")
-
-                # GUIDE ENTRETIEN
-                st.markdown("#### 🎤 Questions Suggérées")
-                interview = d.get('interview', {})
-                for q in interview.get('tech', [])[:2]: 
-                    st.write(f"**Q:** {q.get('q')}")
-                    st.caption(f"💡 {q.get('a')}")
-                for q in interview.get('soft', [])[:2]: 
-                    st.write(f"**Q:** {q.get('q')}")
-                    st.caption(f"💡 {q.get('a')}")
-
-            # --- DROITE ---
-            with col_side:
-                st.markdown("### 📊 Métriques")
+                    for force in forces[:3]:
+                        st.markdown(f"• {force}")
+                with c_r:
+                    st.markdown("**⚠️ Risques**")
+                    for risque in risques:
+                        st.error(f"• {risque}")
                 
-                vals = [scores.get('tech', 0), scores.get('exp', 0), scores.get('soft', 0), scores.get('culture', 0)]
-                fig = go.Figure(data=go.Scatterpolar(r=vals, theta=['Tech', 'Exp', 'Soft', 'Culture'], fill='toself'))
-                fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), height=200, margin=dict(t=20, b=20, l=30, r=30))
+                # Historique
+                hist = data.get('historique', [])
+                if hist:
+                    st.markdown("### 📈 Parcours Pro")
+                    for poste in hist[:3]:
+                        st.markdown(f"**{poste.get('titre')}** chez _{poste.get('entreprise')}_")
+                        st.caption(poste.get('mission', ''))
+            
+            with side_col:
+                # Radar
+                scores = data.get('scores', {})
+                fig = go.Figure(data=go.Scatterpolar(
+                    r=[scores.get('tech',0), scores.get('experience',0), 
+                       scores.get('soft',0), scores.get('culture',0)],
+                    theta=['Tech', 'Exp', 'Soft', 'Fit'],
+                    fill='toself'
+                ))
+                fig.update_layout(height=250, margin=20)
                 st.plotly_chart(fig, use_container_width=True, key=f"radar_{idx}")
                 
-                st.markdown("#### 🛠️ Compétences")
+                # Compétences
+                skills = data.get('competences', {})
+                st.markdown("### 🛠️ Skills")
                 
-                st.markdown("**🏆 Expert**")
-                if skills.get('expert'):
-                    for s in skills['expert']: st.markdown(f"<span class='badge-expert'>{s}</span>", unsafe_allow_html=True)
-                else: st.caption("---")
-
-                st.markdown("**⚡ Intermédiaire**")
-                if skills.get('intermediaire'):
-                    for s in skills['intermediaire']: st.markdown(f"<span class='badge-inter'>{s}</span>", unsafe_allow_html=True)
+                expert = skills.get('expert', [])
+                if expert:
+                    st.markdown("**🏆 Expert**")
+                    for skill in expert:
+                        st.markdown(f"✅ {skill}")
                 
-                st.markdown("**🌱 Junior / Notions**")
-                if skills.get('junior'):
-                    for s in skills['junior']: st.markdown(f"<span class='badge-junior'>{s}</span>", unsafe_allow_html=True)
+                missing = skills.get('manquant', [])
+                if missing:
+                    st.markdown("**❌ Manque**")
+                    for skill in missing:
+                        st.markdown(f"❌ {skill}")
+    
+    # Questions (top candidats)
+    top_candidates = df_filtered.head(3)
+    if not top_candidates.empty:
+        st.markdown("---")
+        st.subheader("🎤 Questions pour Top Candidats")
+        for _, cand in top_candidates.iterrows():
+            questions = cand['data'].get('questions', [])
+            if questions:
+                st.markdown(f"**{cand['nom']}** ({cand['score']}%)")
+                for q in questions[:2]:
+                    with st.expander(q.get('question', 'N/A')):
+                        st.caption(f"💡 Attendu: {q.get('attendu', 'N/A')}")
 
-                st.markdown("**❌ Manquants**")
-                if skills.get('manquant'):
-                    for s in skills['manquant']: st.markdown(f"<span style='color:red; font-size:0.8rem'>• {s}</span>", unsafe_allow_html=True)
-
-elif not launch_btn:
-    st.info("👈 Menu latéral : Chargez l'AO et les CVs pour démarrer.")
+else:
+    st.info("👈 **Chargez l'offre + CVs** pour lancer l'analyse")
+    st.balloons()
