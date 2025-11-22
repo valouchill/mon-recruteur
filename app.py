@@ -11,7 +11,7 @@ import io
 import time
 
 # --- 1. CONFIGURATION & CSS PRO ---
-st.set_page_config(page_title="AI Recruiter PRO - V7 Dashboard", layout="wide", page_icon="👔")
+st.set_page_config(page_title="AI Recruiter PRO - V7.1 Stable", layout="wide", page_icon="👔")
 
 st.markdown("""
 <style>
@@ -49,12 +49,14 @@ def save_to_google_sheet(data, job_desc):
             creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
             client = gspread.authorize(creds)
             sheet = client.open("Recrutement_DB").sheet1
+            infos = data.get('infos', {})
+            scores = data.get('scores', {})
             sheet.append_row([
                 datetime.datetime.now().strftime("%Y-%m-%d"), 
-                data['infos']['nom'], 
-                f"{data['scores']['global']}%",
-                data['infos']['email'],
-                data['infos'].get('linkedin', 'N/A'),
+                infos.get('nom', 'N/A'), 
+                f"{scores.get('global', 0)}%",
+                infos.get('email', 'N/A'),
+                infos.get('linkedin', 'N/A'),
                 job_desc.split('\n')[0][:50]
             ])
     except: pass
@@ -129,7 +131,7 @@ def analyze_candidate_deep(job, cv_text, ponderation):
 if 'all_results' not in st.session_state:
     st.session_state.all_results = []
 
-st.title("👔 AI Recruiter PRO - V7")
+st.title("👔 AI Recruiter PRO - V7.1 Stable")
 
 with st.sidebar:
     st.header("1. Offre (AO)")
@@ -157,12 +159,17 @@ if launch_btn and job_desc and uploaded_files:
             d = analyze_candidate_deep(job_desc, txt, ponderation_input)
             if d:
                 save_to_google_sheet(d, job_desc)
-                lnk = d['infos'].get('linkedin', 'N/A')
+                
+                # Sécurisation des données avant stockage
+                infos = d.get('infos', {})
+                scores = d.get('scores', {})
+                lnk = infos.get('linkedin', 'N/A')
                 final_lnk = lnk if lnk and 'http' in lnk else None
+                
                 batch_res.append({
-                    'Nom': d['infos']['nom'],
-                    'Score': d['scores']['global'],
-                    'Exp': d['infos']['annees_exp'],
+                    'Nom': infos.get('nom', 'Inconnu'),
+                    'Score': scores.get('global', 0),
+                    'Exp': infos.get('annees_exp', 'N/A'),
                     'LinkedIn': final_lnk,
                     'full': d
                 })
@@ -192,87 +199,90 @@ if st.session_state.all_results:
 
     for idx, row in df.iterrows():
         d = row['full']
-        score = row['Score']
+        infos = d.get('infos', {})
+        scores = d.get('scores', {})
+        market = d.get('market', {}) # Sécurisé ici
+        analyse = d.get('analyse', {})
+        skills = d.get('skills_detail', {})
+        
+        score = scores.get('global', 0)
         
         # HEADER DU DOSSIER
-        with st.expander(f"👤 {d['infos']['nom']} | {d['infos'].get('poste_actuel', 'N/A')} | Score: {score}%", expanded=False):
+        with st.expander(f"👤 {infos.get('nom')} | {infos.get('poste_actuel', 'N/A')} | Score: {score}%", expanded=False):
             
-            # 1. BARRE CONTACT & INFO CLÉS
+            # 1. BARRE CONTACT (CORRIGÉE AVEC .get())
             st.markdown(f"""
             <div class="contact-row">
-                <span class="contact-item">📧 {d['infos'].get('email')}</span>
-                <span class="contact-item">📱 {d['infos'].get('tel')}</span>
-                <span class="contact-item">📍 {d['infos'].get('ville')}</span>
-                <span class="contact-item">💰 {d['market'].get('min')} - {d['market'].get('max')} k€ (Est.)</span>
-                <span class="contact-item">🔗 <a href="{d['infos'].get('linkedin', '#')}" target="_blank">LinkedIn</a></span>
+                <span class="contact-item">📧 {infos.get('email', 'N/A')}</span>
+                <span class="contact-item">📱 {infos.get('tel', 'N/A')}</span>
+                <span class="contact-item">📍 {infos.get('ville', 'N/A')}</span>
+                <span class="contact-item">💰 {market.get('min', '?')} - {market.get('max', '?')} k€ (Est.)</span>
+                <span class="contact-item">🔗 <a href="{infos.get('linkedin', '#')}" target="_blank">LinkedIn</a></span>
             </div>
             """, unsafe_allow_html=True)
 
-            # LAYOUT GRILLE 2 COLONNES (2/3 Gauche, 1/3 Droite)
+            # LAYOUT GRILLE
             col_main, col_side = st.columns([2, 1])
 
-            # --- COLONNE PRINCIPALE (GAUCHE) ---
+            # --- GAUCHE ---
             with col_main:
                 st.markdown("### 🧠 Analyse & Parcours")
-                st.info(d['analyse']['verdict'])
+                st.info(analyse.get('verdict', "Pas de verdict disponible."))
                 
-                # PROS / CONS CÔTE À CÔTE
                 c1, c2 = st.columns(2)
                 with c1:
                     st.markdown("**✅ Forces**")
-                    for p in d['analyse']['pros']: st.markdown(f"<div class='box-pro'>{p}</div>", unsafe_allow_html=True)
+                    for p in analyse.get('pros', []): st.markdown(f"<div class='box-pro'>{p}</div>", unsafe_allow_html=True)
                 with c2:
                     st.markdown("**🚨 Vigilance**")
-                    for c in d['analyse']['cons']: st.markdown(f"<div class='box-con'>{c}</div>", unsafe_allow_html=True)
+                    for c in analyse.get('cons', []): st.markdown(f"<div class='box-con'>{c}</div>", unsafe_allow_html=True)
 
-                # HISTORIQUE (RETOUR DE L'INFO PERDUE)
-                st.markdown("#### 📅 Expérience Professionnelle")
+                st.markdown("#### 📅 Expérience")
                 if d.get('historique'):
                     for exp in d['historique']:
-                        st.markdown(f"**{exp['titre']}** chez *{exp['entreprise']}* ({exp['duree']})")
-                        st.caption(f"📝 {exp['resume']}")
+                        st.markdown(f"**{exp.get('titre')}** chez *{exp.get('entreprise')}* ({exp.get('duree')})")
+                        st.caption(f"📝 {exp.get('resume')}")
                         st.markdown("---")
                 else:
-                    st.warning("Historique non détecté dans le PDF.")
+                    st.warning("Historique non détecté.")
 
-                # GUIDE ENTRETIEN (INTEGRÉ EN BAS DE PAGE GAUCHE)
+                # GUIDE ENTRETIEN
                 st.markdown("#### 🎤 Questions Suggérées")
-                for q in d['interview'].get('tech', [])[:2]: # Top 2 questions tech
-                    st.write(f"**Q:** {q['q']}")
-                    st.caption(f"💡 {q['a']}")
-                for q in d['interview'].get('soft', [])[:2]: # Top 2 questions soft
-                    st.write(f"**Q:** {q['q']}")
-                    st.caption(f"💡 {q['a']}")
+                interview = d.get('interview', {})
+                for q in interview.get('tech', [])[:2]: 
+                    st.write(f"**Q:** {q.get('q')}")
+                    st.caption(f"💡 {q.get('a')}")
+                for q in interview.get('soft', [])[:2]: 
+                    st.write(f"**Q:** {q.get('q')}")
+                    st.caption(f"💡 {q.get('a')}")
 
-            # --- COLONNE LATÉRALE (DROITE) ---
+            # --- DROITE ---
             with col_side:
                 st.markdown("### 📊 Métriques")
                 
-                # RADAR
-                vals = [d['scores']['tech'], d['scores']['exp'], d['scores']['soft'], d['scores']['culture']]
+                vals = [scores.get('tech', 0), scores.get('exp', 0), scores.get('soft', 0), scores.get('culture', 0)]
                 fig = go.Figure(data=go.Scatterpolar(r=vals, theta=['Tech', 'Exp', 'Soft', 'Culture'], fill='toself'))
                 fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), height=200, margin=dict(t=20, b=20, l=30, r=30))
                 st.plotly_chart(fig, use_container_width=True, key=f"radar_{idx}")
                 
-                # COMPÉTENCES DÉTAILLÉES PAR NIVEAU
                 st.markdown("#### 🛠️ Compétences")
                 
                 st.markdown("**🏆 Expert**")
-                if d['skills_detail']['expert']:
-                    for s in d['skills_detail']['expert']: st.markdown(f"<span class='badge-expert'>{s}</span>", unsafe_allow_html=True)
-                else: st.caption("Rien de notable")
+                if skills.get('expert'):
+                    for s in skills['expert']: st.markdown(f"<span class='badge-expert'>{s}</span>", unsafe_allow_html=True)
+                else: st.caption("---")
 
                 st.markdown("**⚡ Intermédiaire**")
-                if d['skills_detail']['intermediaire']:
-                    for s in d['skills_detail']['intermediaire']: st.markdown(f"<span class='badge-inter'>{s}</span>", unsafe_allow_html=True)
+                if skills.get('intermediaire'):
+                    for s in skills['intermediaire']: st.markdown(f"<span class='badge-inter'>{s}</span>", unsafe_allow_html=True)
                 
                 st.markdown("**🌱 Junior / Notions**")
-                if d['skills_detail']['junior']:
-                    for s in d['skills_detail']['junior']: st.markdown(f"<span class='badge-junior'>{s}</span>", unsafe_allow_html=True)
+                if skills.get('junior'):
+                    for s in skills['junior']: st.markdown(f"<span class='badge-junior'>{s}</span>", unsafe_allow_html=True)
 
                 st.markdown("**❌ Manquants**")
-                if d['skills_detail']['manquant']:
-                    for s in d['skills_detail']['manquant']: st.markdown(f"<span style='color:red; font-size:0.8rem'>• {s}</span>", unsafe_allow_html=True)
+                if skills.get('manquant'):
+                    for s in skills['manquant']: st.markdown(f"<span style='color:red; font-size:0.8rem'>• {s}</span>", unsafe_allow_html=True)
 
 elif not launch_btn:
     st.info("👈 Menu latéral : Chargez l'AO et les CVs pour démarrer.")
