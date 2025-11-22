@@ -18,7 +18,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS FLAT & HARMONISÉ (SANS NOIR) ---
+# --- CSS FLAT & HARMONISÉ (CORRECTIF UPLOADERS) ---
 st.markdown("""
 <style>
     /* IMPORT FONT INTER */
@@ -26,97 +26,94 @@ st.markdown("""
 
     /* 1. VARIABLES COULEURS (PALETTE INDIGO MONOCHROME) */
     :root {
-        --primary: #4f46e5;       /* Indigo 600 (Action) */
-        --primary-light: #e0e7ff; /* Indigo 100 (Fonds doux) */
-        
-        /* NOUVEAU : Remplacement du noir par un Indigo très profond */
-        --text-main: #312e81;     /* Indigo 900 (Texte principal) */
-        --text-sub: #64748b;      /* Slate 500 (Texte secondaire, gris-bleuté) */
-        
-        --bg-app: #f8fafc;        /* Slate 50 (Fond page) */
-        --border: #cbd5e1;        /* Slate 300 (Bordures douces) */
+        --primary: #4f46e5;       /* Indigo 600 */
+        --primary-light: #e0e7ff; /* Indigo 100 */
+        --text-main: #312e81;     /* Indigo 900 */
+        --text-sub: #64748b;      /* Slate 500 */
+        --bg-app: #f8fafc;        /* Slate 50 */
+        --border: #cbd5e1;        /* Slate 300 */
         --card-bg: #ffffff;
         
-        /* SEMANTIC PASTELS */
         --success-bg: #dcfce7; --success-text: #14532d;
         --warning-bg: #fee2e2; --warning-text: #7f1d1d;
     }
 
-    /* 2. RESET GLOBAL AVEC LA NOUVELLE COULEUR DE TEXTE */
+    /* 2. RESET GLOBAL */
     .stApp { background-color: var(--bg-app); font-family: 'Inter', sans-serif; color: var(--text-main); }
     h1, h2, h3, h4, .stMarkdown { color: var(--text-main) !important; font-family: 'Inter', sans-serif; }
     p, li, label, .stCaption { color: var(--text-sub) !important; }
     
     /* 3. SIDEBAR CLEAN */
     [data-testid="stSidebar"] { background-color: white; border-right: 1px solid var(--border); }
-    /* Force la couleur indigo profond pour les textes de la sidebar */
     [data-testid="stSidebar"] * { color: var(--text-main); }
-    [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: var(--text-sub) !important; }
+    [data-testid="stSidebar"] p, [data-testid="stSidebar"] label, [data-testid="stSidebar"] small { color: var(--text-sub) !important; }
 
-    /* 4. KPI CARDS (FLAT) */
+    /* --- CORRECTIF UPLOADERS (DROPZONES) --- */
+    /* Force la couleur du texte et des icônes à l'intérieur de la zone de drop */
+    [data-testid="stFileUploader"] section {
+        background-color: #f8fafc !important; /* Fond très léger */
+        border: 1px dashed var(--border) !important;
+    }
+    
+    /* Le texte "Drag and drop..." et "Limit 200MB..." */
+    [data-testid="stFileUploader"] section > div, 
+    [data-testid="stFileUploader"] section span, 
+    [data-testid="stFileUploader"] section small {
+        color: var(--text-sub) !important; 
+    }
+    
+    /* L'icône de nuage/upload */
+    [data-testid="stFileUploader"] svg {
+        fill: var(--text-sub) !important;
+        color: var(--text-sub) !important;
+    }
+    
+    /* Le bouton "Browse files" */
+    [data-testid="stFileUploader"] button {
+        color: var(--primary) !important;
+        border-color: var(--primary) !important;
+        background-color: white !important;
+        font-weight: 500;
+    }
+    [data-testid="stFileUploader"] button:hover {
+        background-color: var(--primary-light) !important;
+    }
+
+    /* 4. KPI CARDS */
     .kpi-card {
-        background: white; 
-        padding: 20px; 
-        border: 1px solid var(--border); 
-        border-radius: 8px;
-        text-align: center;
-        height: 100%;
+        background: white; padding: 20px; border: 1px solid var(--border); 
+        border-radius: 8px; text-align: center; height: 100%;
     }
     .kpi-val { font-size: 1.6rem; font-weight: 700; color: var(--primary); margin-bottom: 5px; }
     .kpi-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
 
     /* 5. CARTES CANDIDATS */
     div[data-testid="stExpander"] {
-        background: white; 
-        border: 1px solid var(--border); 
-        border-radius: 8px; 
-        box-shadow: none !important;
-        margin-bottom: 16px;
+        background: white; border: 1px solid var(--border); border-radius: 8px; 
+        box-shadow: none !important; margin-bottom: 16px;
     }
     .streamlit-expanderHeader { background-color: white; color: var(--text-main); font-weight: 600; border-bottom: 1px solid #f1f5f9; }
 
-    /* 6. HEADER CANDIDAT (INTERNE) */
+    /* 6. HEADER CANDIDAT */
     .header-row { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 15px; border-bottom: 1px solid #f1f5f9; margin-bottom: 20px; }
     .c-name { font-size: 1.3rem; font-weight: 700; color: var(--text-main); margin: 0; }
     .c-job { font-size: 0.95rem; color: var(--text-sub); margin-top: 2px; }
     
-    /* SCORE BADGE */
-    .score-box { 
-        background: var(--primary); color: white; 
-        padding: 8px 16px; border-radius: 6px; 
-        font-weight: 700; font-size: 1rem;
-    }
+    .score-box { background: var(--primary); color: white; padding: 8px 16px; border-radius: 6px; font-weight: 700; font-size: 1rem; }
 
-    /* 7. CONTACT PILLS */
-    .pill { 
-        background: #f1f5f9; border: 1px solid #e2e8f0; 
-        color: var(--text-main); padding: 5px 12px; border-radius: 6px; 
-        font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; margin-top: 8px;
-    }
+    /* 7. PILLS */
+    .pill { background: #f1f5f9; border: 1px solid #e2e8f0; color: var(--text-main); padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; margin-top: 8px; }
     .pill a { color: var(--primary) !important; text-decoration: none; font-weight: 600; }
 
     /* 8. BOXES ALIGNÉES */
-    .analysis-container {
-        border: 1px solid var(--border);
-        background-color: #f8fafc;
-        border-radius: 6px;
-        padding: 15px;
-        height: 100%;
-    }
+    .analysis-container { border: 1px solid var(--border); background-color: #f8fafc; border-radius: 6px; padding: 15px; height: 100%; }
     .analysis-title { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-bottom: 10px; display: block; }
     .txt-success { color: #15803d; }
     .txt-danger { color: #b91c1c; }
     .list-item { font-size: 0.9rem; margin-bottom: 6px; display: block; color: var(--text-main); }
 
-    /* 9. VERDICT BOX */
-    .verdict {
-        background: var(--primary-light); 
-        color: var(--text-main); /* Texte indigo profond sur fond indigo clair */
-        padding: 15px; border-radius: 6px; 
-        font-weight: 500; font-size: 0.95rem; line-height: 1.5;
-        border: 1px solid #c7d2fe;
-        margin-bottom: 20px;
-    }
+    /* 9. VERDICT */
+    .verdict { background: var(--primary-light); color: var(--text-main); padding: 15px; border-radius: 6px; font-weight: 500; font-size: 0.95rem; line-height: 1.5; border: 1px solid #c7d2fe; margin-bottom: 20px; }
 
     /* 10. TIMELINE */
     .tl-item { border-left: 2px solid var(--border); padding-left: 15px; margin-bottom: 20px; padding-bottom: 5px; }
@@ -125,16 +122,10 @@ st.markdown("""
     .tl-desc { font-size: 0.9rem; color: var(--text-sub); }
 
     /* 11. SKILL TAGS */
-    .skill-tag {
-        background: white; border: 1px solid var(--border);
-        color: var(--text-main); padding: 4px 10px;
-        border-radius: 4px; font-size: 0.8rem; font-weight: 500;
-        display: inline-block; margin: 2px;
-    }
+    .skill-tag { background: white; border: 1px solid var(--border); color: var(--text-main); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 500; display: inline-block; margin: 2px; }
     .skill-tag.match { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
     .skill-tag.missing { background: #fef2f2; border-color: #fecaca; color: #991b1b; text-decoration: line-through; opacity: 0.7;}
-
-    /* SALARY AMOUNT CORRECTION */
+    
     .salary-amount { font-size: 1.5rem; font-weight: 700; color: var(--text-main); }
 
 </style>
@@ -230,9 +221,11 @@ def save_to_sheets(data, job_desc):
 # SIDEBAR
 with st.sidebar:
     st.markdown("### ⚙️ Paramètres")
+    
     ao_file = st.file_uploader("1. Offre (PDF)", type='pdf', key="ao")
     ao_text_input = st.text_area("Ou texte offre", height=100)
     job_text = extract_pdf(ao_file.getvalue()) if ao_file else ao_text_input
+    
     criteria = st.text_area("2. Critères spécifiques", height=80)
     cv_files = st.file_uploader("3. CVs Candidats", type='pdf', accept_multiple_files=True)
     
@@ -261,7 +254,6 @@ if launch_btn and job_text and cv_files:
 
 # DASHBOARD CONTENT
 if not st.session_state.results:
-    # Mise à jour des couleurs du texte de la landing page pour utiliser la nouvelle variable
     st.markdown("""
     <div style="text-align: center; padding: 60px 20px; color: var(--text-sub);">
         <h1 style="color: var(--text-main);">Bienvenue sur AI Recruiter</h1>
@@ -313,7 +305,7 @@ else:
             # VERDICT
             st.markdown(f"""<div class="verdict">{d['analyse']['verdict']}</div>""", unsafe_allow_html=True)
             
-            # GRID ANALYSE (FORCES / FAIBLESSES ALIGNÉES)
+            # GRID ANALYSE
             c1, c2 = st.columns(2)
             with c1:
                 forces_html = "".join([f"<span class='list-item'>+ {f}</span>" for f in d['analyse']['points_forts'][:4]])
@@ -354,7 +346,7 @@ else:
                     st.caption("Non détecté")
 
             with col_d:
-                # SALAIRE FLAT (Correction de la couleur du montant)
+                # SALAIRE FLAT
                 st.markdown(f"""
                 <div style="padding:15px; border:1px solid #e2e8f0; border-radius:8px; text-align:center; margin-bottom:20px; background: white;">
                     <div style="font-size:0.75rem; color:var(--text-sub); text-transform:uppercase; font-weight:600;">Est. Salaire</div>
