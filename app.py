@@ -18,54 +18,59 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS FLAT & HARMONISÉ ---
+# --- CSS FLAT & HARMONISÉ (SANS NOIR) ---
 st.markdown("""
 <style>
     /* IMPORT FONT INTER */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-    /* 1. VARIABLES COULEURS (PALETTE SLATE/INDIGO) */
+    /* 1. VARIABLES COULEURS (PALETTE INDIGO MONOCHROME) */
     :root {
-        --primary: #4f46e5;       /* Indigo 600 */
-        --primary-light: #e0e7ff; /* Indigo 100 */
-        --text-main: #1e293b;     /* Slate 800 (Remplace le noir) */
-        --text-sub: #64748b;      /* Slate 500 */
-        --bg-app: #f8fafc;        /* Slate 50 */
-        --border: #cbd5e1;        /* Slate 300 */
+        --primary: #4f46e5;       /* Indigo 600 (Action) */
+        --primary-light: #e0e7ff; /* Indigo 100 (Fonds doux) */
+        
+        /* NOUVEAU : Remplacement du noir par un Indigo très profond */
+        --text-main: #312e81;     /* Indigo 900 (Texte principal) */
+        --text-sub: #64748b;      /* Slate 500 (Texte secondaire, gris-bleuté) */
+        
+        --bg-app: #f8fafc;        /* Slate 50 (Fond page) */
+        --border: #cbd5e1;        /* Slate 300 (Bordures douces) */
         --card-bg: #ffffff;
         
-        /* SEMANTIC PASTELS (Pour éviter le ton sur ton illisible) */
+        /* SEMANTIC PASTELS */
         --success-bg: #dcfce7; --success-text: #14532d;
         --warning-bg: #fee2e2; --warning-text: #7f1d1d;
     }
 
-    /* 2. RESET GLOBAL */
+    /* 2. RESET GLOBAL AVEC LA NOUVELLE COULEUR DE TEXTE */
     .stApp { background-color: var(--bg-app); font-family: 'Inter', sans-serif; color: var(--text-main); }
     h1, h2, h3, h4, .stMarkdown { color: var(--text-main) !important; font-family: 'Inter', sans-serif; }
     p, li, label, .stCaption { color: var(--text-sub) !important; }
     
     /* 3. SIDEBAR CLEAN */
     [data-testid="stSidebar"] { background-color: white; border-right: 1px solid var(--border); }
+    /* Force la couleur indigo profond pour les textes de la sidebar */
     [data-testid="stSidebar"] * { color: var(--text-main); }
+    [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: var(--text-sub) !important; }
 
     /* 4. KPI CARDS (FLAT) */
     .kpi-card {
         background: white; 
         padding: 20px; 
         border: 1px solid var(--border); 
-        border-radius: 8px; /* Coins moins ronds */
+        border-radius: 8px;
         text-align: center;
         height: 100%;
     }
     .kpi-val { font-size: 1.6rem; font-weight: 700; color: var(--primary); margin-bottom: 5px; }
     .kpi-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
 
-    /* 5. CARTES CANDIDATS (EXPANDER REWORK) */
+    /* 5. CARTES CANDIDATS */
     div[data-testid="stExpander"] {
         background: white; 
         border: 1px solid var(--border); 
         border-radius: 8px; 
-        box-shadow: none !important; /* SUPPRESSION OMBRES */
+        box-shadow: none !important;
         margin-bottom: 16px;
     }
     .streamlit-expanderHeader { background-color: white; color: var(--text-main); font-weight: 600; border-bottom: 1px solid #f1f5f9; }
@@ -75,14 +80,14 @@ st.markdown("""
     .c-name { font-size: 1.3rem; font-weight: 700; color: var(--text-main); margin: 0; }
     .c-job { font-size: 0.95rem; color: var(--text-sub); margin-top: 2px; }
     
-    /* SCORE BADGE (FLAT) */
+    /* SCORE BADGE */
     .score-box { 
         background: var(--primary); color: white; 
         padding: 8px 16px; border-radius: 6px; 
         font-weight: 700; font-size: 1rem;
     }
 
-    /* 7. CONTACT PILLS (HAUT CONTRASTE) */
+    /* 7. CONTACT PILLS */
     .pill { 
         background: #f1f5f9; border: 1px solid #e2e8f0; 
         color: var(--text-main); padding: 5px 12px; border-radius: 6px; 
@@ -90,37 +95,36 @@ st.markdown("""
     }
     .pill a { color: var(--primary) !important; text-decoration: none; font-weight: 600; }
 
-    /* 8. BOXES ALIGNÉES (FORCES / FAIBLESSES) */
-    /* On utilise Flexbox pour garantir que les boites aient la même allure */
+    /* 8. BOXES ALIGNÉES */
     .analysis-container {
         border: 1px solid var(--border);
         background-color: #f8fafc;
         border-radius: 6px;
         padding: 15px;
-        height: 100%; /* Force la hauteur */
+        height: 100%;
     }
     .analysis-title { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-bottom: 10px; display: block; }
-    .txt-success { color: #15803d; } /* Vert foncé lisible */
-    .txt-danger { color: #b91c1c; } /* Rouge foncé lisible */
+    .txt-success { color: #15803d; }
+    .txt-danger { color: #b91c1c; }
     .list-item { font-size: 0.9rem; margin-bottom: 6px; display: block; color: var(--text-main); }
 
     /* 9. VERDICT BOX */
     .verdict {
         background: var(--primary-light); 
-        color: var(--primary); 
+        color: var(--text-main); /* Texte indigo profond sur fond indigo clair */
         padding: 15px; border-radius: 6px; 
         font-weight: 500; font-size: 0.95rem; line-height: 1.5;
         border: 1px solid #c7d2fe;
         margin-bottom: 20px;
     }
 
-    /* 10. TIMELINE (Epurée) */
+    /* 10. TIMELINE */
     .tl-item { border-left: 2px solid var(--border); padding-left: 15px; margin-bottom: 20px; padding-bottom: 5px; }
     .tl-title { font-weight: 700; color: var(--text-main); font-size: 0.95rem; }
     .tl-date { font-size: 0.75rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600; margin-bottom: 5px; display: block;}
     .tl-desc { font-size: 0.9rem; color: var(--text-sub); }
 
-    /* 11. SKILL TAGS (Uniforme) */
+    /* 11. SKILL TAGS */
     .skill-tag {
         background: white; border: 1px solid var(--border);
         color: var(--text-main); padding: 4px 10px;
@@ -129,6 +133,9 @@ st.markdown("""
     }
     .skill-tag.match { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
     .skill-tag.missing { background: #fef2f2; border-color: #fecaca; color: #991b1b; text-decoration: line-through; opacity: 0.7;}
+
+    /* SALARY AMOUNT CORRECTION */
+    .salary-amount { font-size: 1.5rem; font-weight: 700; color: var(--text-main); }
 
 </style>
 """, unsafe_allow_html=True)
@@ -254,14 +261,15 @@ if launch_btn and job_text and cv_files:
 
 # DASHBOARD CONTENT
 if not st.session_state.results:
+    # Mise à jour des couleurs du texte de la landing page pour utiliser la nouvelle variable
     st.markdown("""
-    <div style="text-align: center; padding: 60px 20px; color: #475569;">
-        <h1 style="color:#1e293b;">Bienvenue sur AI Recruiter</h1>
+    <div style="text-align: center; padding: 60px 20px; color: var(--text-sub);">
+        <h1 style="color: var(--text-main);">Bienvenue sur AI Recruiter</h1>
         <p>Interface simplifiée pour l'analyse de candidatures.</p>
         <div style="margin-top: 40px; display: inline-flex; gap: 20px;">
-            <div style="border:1px solid #e2e8f0; padding:20px; border-radius:8px; width:180px;">📂 Importez l'Offre</div>
-            <div style="border:1px solid #e2e8f0; padding:20px; border-radius:8px; width:180px;">📄 Ajoutez les CVs</div>
-            <div style="border:1px solid #e2e8f0; padding:20px; border-radius:8px; width:180px;">📊 Analysez</div>
+            <div style="border:1px solid #e2e8f0; padding:20px; border-radius:8px; width:180px; color: var(--text-main);">📂 Importez l'Offre</div>
+            <div style="border:1px solid #e2e8f0; padding:20px; border-radius:8px; width:180px; color: var(--text-main);">📄 Ajoutez les CVs</div>
+            <div style="border:1px solid #e2e8f0; padding:20px; border-radius:8px; width:180px; color: var(--text-main);">📊 Analysez</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -274,7 +282,7 @@ else:
     col1, col2, col3, col4 = st.columns(4)
     col1.markdown(f"""<div class="kpi-card"><div class="kpi-val">{len(sorted_res)}</div><div class="kpi-label">Dossiers</div></div>""", unsafe_allow_html=True)
     col2.markdown(f"""<div class="kpi-card"><div class="kpi-val">{avg}%</div><div class="kpi-label">Score Moyen</div></div>""", unsafe_allow_html=True)
-    col3.markdown(f"""<div class="kpi-card"><div class="kpi-val" style="color:#10b981;">{len([x for x in sorted_res if x['scores']['global']>=70])}</div><div class="kpi-label">Qualifiés</div></div>""", unsafe_allow_html=True)
+    col3.markdown(f"""<div class="kpi-card"><div class="kpi-val">{len([x for x in sorted_res if x['scores']['global']>=70])}</div><div class="kpi-label">Qualifiés</div></div>""", unsafe_allow_html=True)
     col4.markdown(f"""<div class="kpi-card"><div class="kpi-val">{sorted_res[0]['scores']['global']}%</div><div class="kpi-label">Top Score</div></div>""", unsafe_allow_html=True)
     
     st.write("") # Spacer
@@ -346,12 +354,12 @@ else:
                     st.caption("Non détecté")
 
             with col_d:
-                # SALAIRE FLAT
+                # SALAIRE FLAT (Correction de la couleur du montant)
                 st.markdown(f"""
-                <div style="padding:15px; border:1px solid #e2e8f0; border-radius:8px; text-align:center; margin-bottom:20px;">
-                    <div style="font-size:0.75rem; color:#64748b; text-transform:uppercase; font-weight:600;">Est. Salaire</div>
-                    <div style="font-size:1.4rem; font-weight:700; color:#1e293b;">{d['salaire']['min']}-{d['salaire']['max']} k€</div>
-                    <div style="font-size:0.8rem; color:#6366f1;">{d['salaire']['confiance']}</div>
+                <div style="padding:15px; border:1px solid #e2e8f0; border-radius:8px; text-align:center; margin-bottom:20px; background: white;">
+                    <div style="font-size:0.75rem; color:var(--text-sub); text-transform:uppercase; font-weight:600;">Est. Salaire</div>
+                    <div class="salary-amount">{d['salaire']['min']}-{d['salaire']['max']} k€</div>
+                    <div style="font-size:0.8rem; color:var(--primary);">{d['salaire']['confiance']}</div>
                 </div>
                 """, unsafe_allow_html=True)
                 
