@@ -6,21 +6,25 @@ import plotly.graph_objects as go
 import datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import pandas as pd # <-- NOUVEAUTÉ : Import de Pandas
 
 # --- 1. CONFIGURATION DE LA PAGE ---
-st.set_page_config(page_title="AI Recruiter PRO - V2.0", layout="wide", page_icon="👑")
+st.set_page_config(page_title="AI Recruiter PRO - V2.1", layout="wide", page_icon="👑")
 
 # --- 2. GESTION DES CLÉS API (SECRETS) ---
 def get_ai_client():
     """Récupère le client Groq via les secrets Streamlit"""
     try:
         if "GROQ_API_KEY" in st.secrets:
+            api_key = st.secrets["GROQ_API_KEY"]
             return openai.OpenAI(
                 base_url="https://api.groq.com/openai/v1", 
-                api_key=st.secrets["GROQ_API_KEY"]
+                api_key=api_key
             )
         return None
-    except: return None
+    except Exception as e:
+        st.error(f"❌ Erreur de connexion API : {e}")
+        return None
 
 def save_to_google_sheet(data, job_desc):
     """Sauvegarde le candidat dans Google Sheets si configuré"""
@@ -32,7 +36,6 @@ def save_to_google_sheet(data, job_desc):
             client = gspread.authorize(creds)
             sheet = client.open("Recrutement_DB").sheet1
             
-            # Utilisation du nom de l'AO pour référence
             poste_ao = job_desc.split('\n')[0][:50]
             
             sheet.append_row([
@@ -57,21 +60,19 @@ def analyze_candidate_deep(job, cv_text, ponderation):
     client = get_ai_client()
     if not client: return None
     
-    # Intégration de la pondération dans le prompt
     ponderation_instruction = f"""
     RÈGLES DE SCORING PONDÉRÉ :
     Si la pondération suivante est fournie, tu dois ajuster le score global (global) pour donner plus d'importance aux mots-clés :
     {ponderation if ponderation else 'PAS DE PONDÉRATION SPÉCIFIQUE. Utilise un scoring équilibré.'}
     """
     
-    # Prompt ultra-détaillé
     prompt = f"""
     Tu es un Chasseur de tête Senior, spécialiste de l'analyse sémantique.
     Compare ce CV à cette OFFRE D'EMPLOI (AO) et estime la finesse du match.
     
     RÈGLES D'ANALYSE ET D'EXTRACTION :
     1. Niveau de Compétence : Pour chaque compétence matcheée, assigne un niveau (Junior, Intermédiaire, Expert).
-    2. Analyse Sémantique : Utilise les synonymes, les déductions logiques (ex: 'Django' implique 'Python') et gère les acronymes/langues.
+    2. Analyse Sémantique : Utilise les synonymes, les déductions logiques et gère les acronymes/langues.
     3. Historique : Extrais la chronologie des 3 derniers postes du candidat.
     4. Red Flags : Les points faibles dans 'comparatif/points_faibles' doivent inclure des alertes sur le CV (ex: 'job-hopping', 'trous de 1 an', 'manque d'expérience managériale').
 
@@ -120,7 +121,6 @@ def analyze_candidate_deep(job, cv_text, ponderation):
     
     try:
         res = client.chat.completions.create(
-            # Utilisation du modèle le plus récent
             model="llama-3.3-70b-versatile", 
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
@@ -128,7 +128,7 @@ def analyze_candidate_deep(job, cv_text, ponderation):
         )
         return json.loads(res.choices[0].message.content)
     except Exception as e:
-        st.error(f"❌ Erreur lors de l'analyse IA. Vérifiez le modèle Groq: {e}")
+        st.error(f"❌ Erreur lors de l'analyse IA. Message : {e}")
         return None
 
 # --- 4. INTERFACE UTILISATEUR (FRONTEND) ---
@@ -146,7 +146,7 @@ with st.sidebar:
         "Poids des compétences (Optionnel)",
         height=100,
         placeholder="Ex:\nPython: 50%\nAWS: 30%\nSoft Skills: 20%",
-        help="Permet d'ajuster le score global. Si vide, le score est équilibré."
+        help="Ajuste le score global. Si vide, le score est équilibré."
     )
     
     st.divider()
@@ -156,36 +156,55 @@ with st.sidebar:
     launch_btn = st.button("⚡ Lancer l'Analyse", type="primary")
     st.caption("Propulsé par Groq (Llama 3.3) & Streamlit")
 
+
+# Stockage des résultats pour le tableau récapitulatif
+all_results = [] 
+
 # Zone Principale (Résultats)
 if launch_btn and job_desc and uploaded_files:
     
     st.write(f"🔄 Analyse en cours de {len(uploaded_files)} dossier(s)...")
     progress_bar = st.progress(0)
     
+    # Boucle d'analyse
     for i, file in enumerate(uploaded_files):
         text_cv = extract_text_from_pdf(file)
         
         if text_cv:
-            # Appel IA avec pondération
             data = analyze_candidate_deep(job_desc, text_cv, ponderation_input)
             
             if data:
-                # Sauvegarde Cloud
                 save_to_google_sheet(data, job_desc)
 
-                # --- AFFICHAGE CARTE CANDIDAT ---
+                # --- Préparation pour le tableau récapitulatif ---
+                
+                # Extraction des Red Flags pour le tableau
+                red_flags_list = [f for f in data['comparatif']['points_faibles'] if 'red flag' in f.lower()]
+                first_red_flag = red_flags_list[0] if red_flags_list else "Rien de critique"
+                
+                # Ajout à la liste globale
+                all_results.append({
+                    'Nom': data['infos']['nom'],
+                    'Score (%)': data['scores']['global'],
+                    'Exp. (ans)': data['infos']['annees_exp'].split(' ')[0], # Prendre le nombre d'années
+                    'Verdict': data['analyse_skills']['verdict_technique'],
+                    'Red Flag Principal': first_red_flag,
+                    'Email': data['infos']['email'],
+                })
+
+                # --- AFFICHAGE CARTE CANDIDAT DÉTAILLÉE ---
+                
                 score = data['scores']['global']
                 color = "green" if score >= 75 else "blue" if score >= 60 else "orange" if score >= 40 else "red"
                 
-                with st.expander(f"👤 **{data['infos']['nom']}** - Match: :{color}[{score}%] - {data['infos']['poste_vise']}", expanded=True):
+                with st.expander(f"👤 **{data['infos']['nom']}** - Match: :{color}[{score}%] - {data['infos']['poste_vise']}", expanded=False): # Fermé par défaut
                     
-                    # 1. EN-TÊTE D'INFO & RED FLAGS
+                    # EN-TÊTE D'INFO & RED FLAGS
                     c_info1, c_info2 = st.columns([2, 1])
                     
                     with c_info1:
                         st.info(f"🧠 **Verdict:** {data['analyse_skills']['verdict_technique']}")
                         
-                        # RED FLAGS (NOUVEAUTÉ)
                         if data['comparatif']['points_faibles']:
                             st.markdown("🚩 **Alertes (Red Flags / Points Faibles) :**")
                             for f in data['comparatif']['points_faibles']:
@@ -193,36 +212,27 @@ if launch_btn and job_desc and uploaded_files:
 
                     with c_info2:
                         st.subheader("Historique des Postes")
-                        # HISTORIQUE (NOUVEAUTÉ)
                         for item in data['historique']:
                              st.markdown(f"**{item.get('titre', 'N/A')}** ({item.get('duree', 'N/A')})")
                              st.caption(f"Période: {item.get('periode', 'N/A')}")
                     
                     st.divider()
 
-                    # 2. COLONNES PRINCIPALES : GRAPH + NIVEAUX DE SKILLS
+                    # COLONNES PRINCIPALES : GRAPH + NIVEAUX DE SKILLS
                     c_graph, c_skills = st.columns([1, 2])
                     
                     with c_graph:
                         # Radar Chart
                         categories = ['Tech', 'Expérience', 'Soft Skills', 'Culture']
-                        values = [
-                            data['scores']['tech_hard_skills'],
-                            data['scores']['experience'],
-                            data['scores']['soft_skills'],
-                            data['scores']['fit_culturel']
-                        ]
+                        values = [data['scores']['tech_hard_skills'], data['scores']['experience'], data['scores']['soft_skills'], data['scores']['fit_culturel']]
                         fig = go.Figure(data=go.Scatterpolar(r=values, theta=categories, fill='toself', name=data['infos']['nom']))
                         fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), height=220, margin=dict(t=20, b=20, l=30, r=30))
                         st.plotly_chart(fig, use_container_width=True)
                         
                     with c_skills:
                         st.subheader("Détail des Compétences & Niveaux")
-                        
-                        # AFFICHAGE DES NIVEAUX DE COMPÉTENCE (NOUVEAUTÉ)
                         if data['analyse_skills']['competences_matchees']:
                             for comp in data['analyse_skills']['competences_matchees']:
-                                # Assigner une couleur basée sur le niveau
                                 niveau_lower = comp.get('niveau', '').lower()
                                 niveau_color = "green" if "expert" in niveau_lower else "blue" if "intermédiaire" in niveau_lower else "orange"
                                 
@@ -231,7 +241,6 @@ if launch_btn and job_desc and uploaded_files:
                         
                         st.markdown("---") 
                         
-                        # Badges Rouges (Manquants)
                         st.write("❌ **Compétences Vraiment Manquantes (Gaps) :**")
                         misses_html = "".join([f"<span style='background:#f8d7da; color:#721c24; padding:5px 10px; border-radius:15px; margin:2px; display:inline-block; font-size:0.9em'>{s}</span>" for s in data['analyse_skills']['skills_missing']])
                         st.markdown(misses_html, unsafe_allow_html=True)
@@ -255,7 +264,23 @@ if launch_btn and job_desc and uploaded_files:
         progress_bar.progress((i + 1) / len(uploaded_files))
         
     progress_bar.empty()
-    st.success("✅ Analyse terminée avec succès ! La version PRO est en ligne.")
+    st.success("✅ Analyse terminée avec succès ! Le tableau récapitulatif est disponible ci-dessous.")
+    
+    # --- 5. AFFICHAGE DU TABLEAU COMPARATIF (NOUVEAUTÉ MAJEURE) ---
+    if all_results:
+        st.header("📊 Tableau Comparatif des Candidats")
+        
+        # Création du DataFrame
+        df = pd.DataFrame(all_results)
+        
+        # Conversion du Score en entier pour un tri facile
+        df['Score (%)'] = df['Score (%)'].astype(int)
+        
+        # Tri par Score (du meilleur au moins bon)
+        df_sorted = df.sort_values(by='Score (%)', ascending=False)
+        
+        # Affichage du tableau interactif
+        st.dataframe(df_sorted, use_container_width=True, height=len(df)*36 + 35)
 
 elif launch_btn:
     st.warning("⚠️ Veuillez ajouter une description de poste ET des fichiers PDF.")
