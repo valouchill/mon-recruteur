@@ -11,7 +11,7 @@ import io
 import time
 
 # --- 1. CONFIGURATION ---
-st.set_page_config(page_title="AI Recruiter PRO - V4.5 Interview Edition", layout="wide", page_icon="🎯")
+st.set_page_config(page_title="AI Recruiter PRO - V5.0 Full Profile", layout="wide", page_icon="💎")
 
 # --- 2. SERVICES & UTILS ---
 def get_ai_client():
@@ -22,7 +22,6 @@ def get_ai_client():
     return None
 
 def save_to_google_sheet(data, job_desc):
-    """Sauvegarde avec gestion d'erreurs silencieuse"""
     try:
         if "gcp_service_account" in st.secrets:
             scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -46,21 +45,28 @@ def extract_text_from_pdf(file_bytes):
         return "".join([page.extract_text() for page in reader.pages if page.extract_text()])
     except: return ""
 
-# --- 3. CŒUR DU SYSTÈME : ANALYSE PROFONDE ---
+# --- 3. CŒUR DU SYSTÈME : ANALYSE ENRICHIE ---
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def analyze_candidate_deep(job, cv_text, ponderation):
     client = get_ai_client()
     if not client: return None
     
-    ponderation_txt = f"PONDÉRATION CLIENT: {ponderation}" if ponderation else "Pas de pondération spécifique."
+    ponderation_txt = f"PONDÉRATION: {ponderation}" if ponderation else ""
     
     prompt = f"""
-    Tu es un Expert en Recrutement Technique & Psychologie du travail.
+    Tu es un Expert en Recrutement et Rémunération.
     
     TACHE :
-    1. Analyse le fit entre le CV et l'AO.
-    2. Construit un GUIDE D'ENTRETIEN complet avec les réponses attendues ("Cheat Sheet").
+    1. Analyse le fit CV/AO.
+    2. Extrais précisément les contacts (Email, Tel, VILLE DE RÉSIDENCE).
+    3. Estime la VALEUR MARCHÉ (Salaire) du candidat.
+    
+    CONTEXTE SALAIRE : 
+    Base ton estimation sur le marché actuel (Tech/Digital) en prenant en compte :
+    - L'expérience (Junior/Medior/Senior)
+    - La localisation (Paris vs Province, à déduire du CV ou de l'AO)
+    - La rareté des compétences.
     
     {ponderation_txt}
     
@@ -72,10 +78,11 @@ def analyze_candidate_deep(job, cv_text, ponderation):
         "infos": {{
             "nom": "Prénom Nom",
             "email": "Email ou N/A",
-            "linkedin": "URL LinkedIn ou N/A",
-            "tel": "Tel ou N/A",
-            "annees_exp": "X ans (Requis: Y ans)",
-            "poste_actuel": "Titre actuel"
+            "tel": "Tel format standard ou N/A",
+            "ville": "Ville/Région (ex: Lyon, IDF...)",
+            "linkedin": "URL ou N/A",
+            "annees_exp": "X ans",
+            "poste_actuel": "Titre"
         }},
         "scores": {{
             "global": 0-100,
@@ -84,27 +91,32 @@ def analyze_candidate_deep(job, cv_text, ponderation):
             "soft": 0-10,
             "culture": 0-10
         }},
+        "market_value": {{
+            "fourchette_k": "XXk - YYk",
+            "devise": "€",
+            "justification": "Ex: Profil Senior sur stack rare (Rust), marché parisien tendu."
+        }},
         "analyse_match": {{
-            "verdict_court": "Une phrase percutante de synthèse.",
-            "points_forts": ["Force 1 (contexte)", "Force 2"],
-            "points_vigilance": ["Risque 1 (ex: job hopping)", "Manque Skill X"],
-            "skills_missing": ["Skill A", "Skill B"]
+            "verdict_court": "Synthèse percutante.",
+            "points_forts": ["Force 1", "Force 2"],
+            "points_vigilance": ["Risque 1", "Risque 2"],
+            "skills_missing": ["Skill A"]
         }},
         "guide_entretien": {{
             "questions_globales": [
-                {{"q": "Question brise-glace ou parcours", "attendu": "Ce qu'on veut entendre"}}
+                {{"q": "Question parcours", "attendu": "Réponse cible"}}
             ],
             "questions_techniques": [
-                {{"q": "Question technique précise sur une compétence de l'AO", "attendu": "La réponse technique correcte ou mots-clés attendus"}}
+                {{"q": "Question technique", "attendu": "Mots-clés techniques"}}
             ],
             "questions_soft_skills": [
-                {{"q": "Question situationnelle (STAR method)", "attendu": "Comportement recherché"}}
+                {{"q": "Question soft skill", "attendu": "Comportement"}}
             ]
         }}
     }}
     """
     
-    for _ in range(3): # Retry simple
+    for _ in range(3):
         try:
             res = client.chat.completions.create(
                 model="llama-3.3-70b-versatile", 
@@ -121,7 +133,7 @@ def analyze_candidate_deep(job, cv_text, ponderation):
 if 'all_results' not in st.session_state:
     st.session_state.all_results = []
 
-st.title("🎯 AI Recruiter PRO - Interview Edition")
+st.title("💎 AI Recruiter PRO - V5.0")
 
 with st.sidebar:
     st.header("1. Le Besoin (AO)")
@@ -129,10 +141,10 @@ with st.sidebar:
     ao_txt = st.text_area("Ou texte AO", height=100)
     
     job_desc = extract_text_from_pdf(uploaded_ao.getvalue()) if uploaded_ao else ao_txt
-    if uploaded_ao: st.success("AO PDF chargée !")
+    if uploaded_ao: st.success("AO chargée !")
 
     st.subheader("Critères")
-    ponderation_input = st.text_area("Pondération", placeholder="Ex: Anglais obligatoire, Python expert...", height=70)
+    ponderation_input = st.text_area("Pondération", height=70)
     
     st.divider()
     st.header("2. Les Candidats")
@@ -155,7 +167,6 @@ if launch_btn and job_desc and uploaded_files:
             d = analyze_candidate_deep(job_desc, txt, ponderation_input)
             if d:
                 save_to_google_sheet(d, job_desc)
-                # Nettoyage Lien
                 lnk = d['infos'].get('linkedin', 'N/A')
                 final_lnk = lnk if lnk and 'http' in lnk else None
                 
@@ -177,7 +188,6 @@ if st.session_state.all_results:
     df = pd.DataFrame(st.session_state.all_results)
     df = df.sort_values('Score', ascending=False)
     
-    # Tableau
     st.subheader("📊 Vue d'ensemble")
     st.dataframe(
         df.drop(columns=['full']),
@@ -190,7 +200,7 @@ if st.session_state.all_results:
     )
     
     st.divider()
-    st.header("📝 Dossiers Candidats & Guide d'Entretien")
+    st.header("📝 Dossiers Complets")
 
     for idx, row in df.iterrows():
         d = row['full']
@@ -199,64 +209,83 @@ if st.session_state.all_results:
         
         with st.expander(f"**{d['infos']['nom']}** - :{color}[{score}%] - {d['infos'].get('poste_actuel', '')}", expanded=False):
             
-            # --- BLOC 1 : SYNTHÈSE VISUELLE ---
-            c1, c2, c3 = st.columns([1, 1, 1])
+            # --- NOUVEAU BLOC 1 : INFORMATIONS DE CONTACT ---
+            st.markdown("### 📇 Coordonnées")
+            c_cont1, c_cont2, c_cont3, c_cont4 = st.columns(4)
             
-            with c1:
-                st.markdown("#### 🧠 Verdict")
-                st.info(d['analyse_match']['verdict_court'])
-                if row['LinkedIn']:
-                    st.markdown(f"🔗 [**Profil LinkedIn**]({row['LinkedIn']})")
+            with c_cont1:
+                st.markdown(f"📧 **Email**\n\n`{d['infos'].get('email', 'N/A')}`")
+            with c_cont2:
+                st.markdown(f"📞 **Téléphone**\n\n`{d['infos'].get('tel', 'N/A')}`")
+            with c_cont3:
+                st.markdown(f"📍 **Localisation**\n\n`{d['infos'].get('ville', 'Non précisée')}`")
+            with c_cont4:
+                lnk_display = d['infos'].get('linkedin', 'N/A')
+                if 'http' in lnk_display:
+                    st.markdown(f"🔗 **LinkedIn**\n\n[Voir le profil]({lnk_display})")
+                else:
+                    st.markdown("🔗 **LinkedIn**\n\nN/A")
             
-            with c2:
-                st.markdown("#### 📊 Radar")
+            st.divider()
+
+            # --- BLOC 2 : ANALYSE & SALAIRE ---
+            c_main, c_salary = st.columns([2, 1])
+            
+            with c_main:
+                st.info(f"🧠 **Verdict:** {d['analyse_match']['verdict_court']}")
+                
+                # Radar
                 vals = [d['scores']['tech'], d['scores']['exp'], d['scores']['soft'], d['scores']['culture']]
                 fig = go.Figure(data=go.Scatterpolar(r=vals, theta=['Tech', 'Exp', 'Soft', 'Culture'], fill='toself'))
-                fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), height=150, margin=dict(t=0, b=0, l=20, r=20))
+                fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), height=180, margin=dict(t=10, b=10, l=30, r=30))
                 st.plotly_chart(fig, use_container_width=True, key=f"radar_{idx}")
 
-            with c3:
-                st.markdown("#### ⚠️ Manquants")
-                if d['analyse_match']['skills_missing']:
-                    for s in d['analyse_match']['skills_missing']:
-                        st.markdown(f"❌ {s}")
-                else:
-                    st.success("Aucun manque critique détecté.")
+            # --- NOUVEAU BLOC : INTELLIGENCE MARCHÉ (SALAIRE) ---
+            with c_salary:
+                st.markdown("### 💰 Valeur Marché Estimée")
+                salary_data = d.get('market_value', {})
+                
+                # Container stylé pour le salaire
+                st.markdown(
+                    f"""
+                    <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #d1d5db;">
+                        <h2 style="color: #0068c9; margin:0;">{salary_data.get('fourchette_k', 'N/A')} {salary_data.get('devise', '€')}</h2>
+                        <p style="font-size: 0.9em; color: #555; margin-top:5px;">Brut Annuel Estimé</p>
+                    </div>
+                    """, 
+                    unsafe_allow_html=True
+                )
+                
+                st.markdown("**Justification IA :**")
+                st.caption(salary_data.get('justification', "Pas assez de données pour estimer."))
 
-            # --- BLOC 2 : FORCES vs FAIBLESSES ---
-            st.markdown("---")
-            c_force, c_faible = st.columns(2)
-            with c_force:
+            # --- BLOC 3 : FORCES / FAIBLESSES ---
+            c_f, c_w = st.columns(2)
+            with c_f:
                 st.success("✅ **Points Forts**")
-                for f in d['analyse_match']['points_forts']: st.write(f"- {f}")
-            with c_faible:
-                st.warning("🚨 **Points de Vigilance**")
-                for v in d['analyse_match']['points_vigilance']: st.write(f"- {v}")
+                for x in d['analyse_match']['points_forts']: st.write(f"- {x}")
+            with c_w:
+                st.error("🚨 **Points de Vigilance**")
+                for x in d['analyse_match']['points_vigilance']: st.write(f"- {x}")
 
-            # --- BLOC 3 : LE GUIDE D'ENTRETIEN (AMÉLIORÉ) ---
-            st.markdown("---")
-            st.subheader("🎤 Guide d'Entretien & Attentes")
+            # --- BLOC 4 : GUIDE D'ENTRETIEN ---
+            st.divider()
+            st.subheader("🎤 Guide d'Entretien")
             
             guide = d.get('guide_entretien', {})
+            t1, t2, t3 = st.tabs(["Général", "Technique", "Soft Skills"])
             
-            t1, t2, t3 = st.tabs(["🌍 Général & Parcours", "💻 Technique & Hard Skills", "🤝 Soft Skills & Culture"])
-            
-            def display_questions(q_list):
-                if not q_list: st.write("Pas de questions générées."); return
-                for q_item in q_list:
-                    # Utilisation d'un expander interne pour cacher la réponse
+            def show_q(lst):
+                if not lst: st.write("N/A"); return
+                for item in lst:
                     with st.container():
-                        st.markdown(f"**❓ {q_item['q']}**")
-                        with st.expander("👁️ Voir la réponse attendue (Indice)"):
-                            st.markdown(f"💡 *{q_item['attendu']}*")
-                        st.write("") # Spacer
-
-            with t1:
-                display_questions(guide.get('questions_globales', []))
-            with t2:
-                display_questions(guide.get('questions_techniques', []))
-            with t3:
-                display_questions(guide.get('questions_soft_skills', []))
+                        st.write(f"❓ **{item['q']}**")
+                        with st.expander("💡 Réponse attendue"):
+                            st.caption(item['attendu'])
+            
+            with t1: show_q(guide.get('questions_globales', []))
+            with t2: show_q(guide.get('questions_techniques', []))
+            with t3: show_q(guide.get('questions_soft_skills', []))
 
 elif not launch_btn:
-    st.info("👈 Commencez par charger l'AO et les CVs.")
+    st.info("👈 Chargez l'AO et les CVs pour démarrer.")
