@@ -18,7 +18,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS FLAT & HARMONISÉ (CORRECTIF EXPANDER + QUESTIONS) ---
+# --- CSS FLAT & HARMONISÉ ---
 st.markdown("""
 <style>
     /* IMPORT FONT INTER */
@@ -62,8 +62,7 @@ st.markdown("""
     [data-testid="stFileUploader"] svg { fill: var(--text-sub) !important; }
     [data-testid="stFileUploader"] button { color: var(--primary) !important; border-color: var(--primary) !important; background-color: white !important; }
 
-    /* --- CORRECTIF EXPANDER (BOUTON DEPLIABLE) --- */
-    /* Force le fond blanc et le texte indigo même quand actif/focus */
+    /* --- CORRECTIF EXPANDER --- */
     div[data-testid="stExpander"] {
         background: white; border: 1px solid var(--border); border-radius: 8px; 
         box-shadow: none !important; margin-bottom: 16px;
@@ -74,13 +73,8 @@ st.markdown("""
         font-weight: 600; 
         border-bottom: 1px solid #f1f5f9; 
     }
-    .streamlit-expanderHeader:hover {
-        color: var(--primary) !important;
-    }
-    /* Cible l'icône flèche pour qu'elle ne soit pas noire */
-    .streamlit-expanderHeader svg {
-        fill: var(--text-sub) !important;
-    }
+    .streamlit-expanderHeader:hover { color: var(--primary) !important; }
+    .streamlit-expanderHeader svg { fill: var(--text-sub) !important; }
 
     /* 4. DESIGN ELEMENTS */
     .kpi-card { background: white; padding: 20px; border: 1px solid var(--border); border-radius: 8px; text-align: center; height: 100%; }
@@ -114,9 +108,8 @@ st.markdown("""
     
     .salary-amount { font-size: 1.5rem; font-weight: 700; color: var(--text-main); }
 
-    /* 5. NOUVEAU STYLE QUESTIONS CHALLENGE */
     .question-box {
-        background-color: #f1f5f9; /* Slate 100 */
+        background-color: #f1f5f9;
         border-left: 3px solid var(--primary);
         padding: 12px;
         margin-bottom: 10px;
@@ -181,7 +174,7 @@ def analyze_candidate(job, cv, criteria=""):
     CV: {cv[:3000]}
     
     TACHE: Analyse critique.
-    IMPORTANT: La section "entretien" doit contenir 3 questions PIÈGES/CHALLENGE spécifiques aux lacunes du candidat par rapport à l'offre. Pas de questions génériques.
+    IMPORTANT: La section "entretien" doit contenir 3 questions PIÈGES/CHALLENGE spécifiques aux lacunes du candidat par rapport à l'offre.
     
     JSON STRICT:
     {{
@@ -191,7 +184,7 @@ def analyze_candidate(job, cv, criteria=""):
         "competences": {{ "match": ["Skill A", "Skill B"], "manquant": ["Skill C"] }},
         "analyse": {{ "verdict": "Synthèse objective (2 lignes).", "points_forts": ["Point A", "Point B"], "points_faibles": ["Point C", "Point D"] }},
         "historique": [ {{ "titre": "...", "entreprise": "...", "duree": "...", "resume_synthetique": "Action principale." }} ],
-        "entretien": [ {{ "theme": "Hard Skill / Experience Gap", "question": "Question précise pour vérifier une compétence douteuse", "attendu": "Réponse idéale attendue" }} ]
+        "entretien": [ {{ "theme": "Challenge", "question": "Question précise", "attendu": "Réponse idéale" }} ]
     }}
     """
     try:
@@ -278,7 +271,7 @@ else:
         i = d['infos']
         s = d['scores']
         
-        # Expander (maintenant blanc/indigo)
+        # --- CORRECTIF : EXPANDER AVEC KEY UNIQUE POUR ÉVITER LE BUG PLOTLY ---
         with st.expander(f"{i['nom']}  —  {s['global']}%", expanded=(idx==0)):
             
             # HEADER
@@ -360,7 +353,8 @@ else:
                     showlegend=False, margin=dict(t=20, b=20, l=30, r=30), height=220,
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
                 )
-                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                # --- KEY UNIQUE AJOUTÉE ICI ---
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=f"radar_{idx}")
             
             # SKILLS TAGS
             st.markdown("#### Compétences")
@@ -376,7 +370,6 @@ else:
             # --- NOUVELLE SECTION QUESTIONS CHALLENGE ---
             st.markdown("#### 🎯 Challenge & Entretien")
             
-            # Affichage en grille (2 colonnes) pour les questions
             q_col1, q_col2 = st.columns(2)
             for i, q in enumerate(d['entretien']):
                 target_col = q_col1 if i % 2 == 0 else q_col2
