@@ -11,7 +11,7 @@ import io
 import time
 
 # --- 1. CONFIGURATION DE LA PAGE ---
-st.set_page_config(page_title="AI Recruiter PRO - V3.0", layout="wide", page_icon="👑")
+st.set_page_config(page_title="AI Recruiter PRO - V4.0", layout="wide", page_icon="🚀")
 
 # --- 2. GESTION DES CLÉS API (SECRETS) ---
 def get_ai_client():
@@ -45,18 +45,17 @@ def save_to_google_sheet(data, job_desc):
                 data['infos']['nom'], 
                 f"{data['scores']['global']}%",
                 data['infos']['email'],
+                data['infos'].get('linkedin', 'N/A'), # Ajout LinkedIn
                 poste_ao
             ])
     except Exception as e:
-        # On log juste l'erreur sans bloquer l'app
         print(f"Warning Google Sheets: {e}")
 
-# --- AMÉLIORATION 1 : CACHING & PDF ---
+# --- CACHING & PDF ---
 @st.cache_data(show_spinner=False)
 def extract_text_from_pdf(file_bytes):
     """Extrait le texte brut d'un PDF (Version Cachée)"""
     try:
-        # On utilise io.BytesIO car st.file_uploader renvoie un objet qui peut être fermé
         reader = PdfReader(io.BytesIO(file_bytes))
         text = "".join([page.extract_text() for page in reader.pages if page.extract_text()])
         return text
@@ -64,7 +63,6 @@ def extract_text_from_pdf(file_bytes):
 
 # --- 3. CŒUR DU SYSTÈME : L'ANALYSE INTELLIGENTE ---
 
-# --- AMÉLIORATION 2 : CACHING & RETRY ---
 @st.cache_data(ttl=3600, show_spinner=False)
 def analyze_candidate_deep(job, cv_text, ponderation):
     """Analyse IA avec cache d'une heure"""
@@ -73,45 +71,40 @@ def analyze_candidate_deep(job, cv_text, ponderation):
     
     ponderation_instruction = f"""
     RÈGLES DE SCORING PONDÉRÉ :
-    Si la pondération suivante est fournie, tu dois ajuster le score global (global) pour donner plus d'importance aux mots-clés :
+    Si la pondération suivante est fournie, tu dois ajuster le score global pour respecter ces priorités :
     {ponderation if ponderation else 'PAS DE PONDÉRATION SPÉCIFIQUE. Utilise un scoring équilibré.'}
     """
     
-    # --- AMÉLIORATION 3 : PROMPT OPTIMISÉ (CHAIN-OF-THOUGHT) ---
+    # Prompt mis à jour pour extraire LinkedIn
     prompt = f"""
-    Tu es un Chasseur de tête Senior. RAISONNE ÉTAPE PAR ÉTAPE :
-
-    ÉTAPE 1 - Extraction des faits bruts :
-    - Liste les compétences explicitement mentionnées dans le CV.
-    - Identifie les durées exactes de chaque poste.
-
-    ÉTAPE 2 - Déduction sémantique :
-    - Pour chaque compétence de l'AO, cherche des synonymes/équivalents dans le CV.
-    - Exemple : "Kubernetes" peut être déduit de "orchestration de conteneurs Docker en production".
-
-    ÉTAPE 3 - Analyse des "Red Flags" :
-    - Trous inexpliqués (> 6 mois).
-    - Job hopping (changements fréquents < 1 an).
-    - Incohérence Titre vs Expérience réelle.
-
-    Compare ce CV à cette OFFRE D'EMPLOI (AO) et génère le JSON final.
+    Tu es un Chasseur de tête Senior.
+    
+    OBJECTIF :
+    1. Analyser le match entre le CV et l'AO.
+    2. Extraire les données de contact incluant le LIEN LINKEDIN.
+    
+    PROCESSUS :
+    1. Cherche explicitement une URL LinkedIn dans le texte (http...linkedin.com...). Si trouvée, mets-la dans infos.linkedin.
+    2. Estime le niveau d'expérience et les compétences.
+    3. Identifie les Red Flags.
 
     {ponderation_instruction}
     
     OFFRE (AO) : {job[:2500]}
     CV CANDIDAT : {cv_text[:3500]}
     
-    Réponds UNIQUEMENT avec ce JSON strict et complet :
+    Réponds UNIQUEMENT avec ce JSON strict :
     {{
         "infos": {{
             "nom": "Prénom Nom",
             "email": "Email ou N/A",
+            "linkedin": "URL complète ou N/A", 
             "tel": "Tel ou N/A",
             "annees_exp": "X ans (estimé)",
             "poste_vise": "Titre du poste deviné"
         }},
         "scores": {{
-            "global": 0-100 (Ajusté par la pondération),
+            "global": 0-100,
             "tech_hard_skills": 0-10,
             "experience": 0-10,
             "soft_skills": 0-10,
@@ -119,27 +112,25 @@ def analyze_candidate_deep(job, cv_text, ponderation):
         }},
         "analyse_skills": {{
             "competences_matchees": [
-                {{"nom": "Compétence", "niveau": "Junior/Intermédiaire/Expert", "source": "Détail de la déduction"}}
+                {{"nom": "Compétence", "niveau": "Junior/Intermédiaire/Expert", "source": "Détail"}}
             ],
-            "skills_missing": ["Skill X Manquant", "Skill Y Manquant"],
-            "verdict_technique": "Phrase résumant la pertinence technique."
+            "skills_missing": ["Skill X", "Skill Y"],
+            "verdict_technique": "Résumé court."
         }},
         "historique": [
-            {{"titre": "Poste 1 (Le plus récent)", "duree": "X ans", "periode": "YYYY-YYYY"}},
-            {{"titre": "Poste 2", "duree": "X ans", "periode": "YYYY-YYYY"}}
+            {{"titre": "Poste", "duree": "X ans", "periode": "YYYY-YYYY"}}
         ],
         "comparatif": {{
             "points_forts": ["Force 1", "Force 2"],
-            "points_faibles": ["Faible 1 (Red Flag ou Gap majeur)", "Faible 2"]
+            "points_faibles": ["Faible 1", "Faible 2"]
         }},
         "action": {{
-            "questions_entretien": ["Question 1", "Question 2"],
-            "email_draft": "Brouillon d'email."
+            "questions_entretien": ["Q1", "Q2"],
+            "email_draft": "Brouillon court."
         }}
     }}
     """
     
-    # Logique de Retry
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -152,193 +143,190 @@ def analyze_candidate_deep(job, cv_text, ponderation):
             return json.loads(res.choices[0].message.content)
         except Exception as e:
             if attempt == max_retries - 1:
-                st.error(f"❌ Erreur IA après {max_retries} essais : {e}")
+                st.error(f"❌ Erreur IA : {e}")
                 return None
-            time.sleep(1) # Attente courte avant retry
+            time.sleep(1)
 
 # --- 4. INTERFACE UTILISATEUR (FRONTEND) ---
 
-# --- AMÉLIORATION 4 : SESSION STATE ---
 if 'all_results' not in st.session_state:
     st.session_state.all_results = []
 
-st.title("👑 AI Recruiter PRO - V3.0")
-st.markdown("Analyse de la finesse du match, Niveaux de compétences et Red Flags.")
+st.title("🚀 AI Recruiter PRO - V4.0")
 
-# Barre latérale (Inputs)
+# Barre latérale
 with st.sidebar:
     st.header("1. Le Besoin (AO)")
-    job_desc = st.text_area("Collez l'offre d'emploi ici", height=200, placeholder="Ex: Développeur Fullstack, 5 ans exp, Python/React...")
     
-    st.subheader("Pondération (Avancé)")
-    ponderation_input = st.text_area(
-        "Poids des compétences (Optionnel)",
-        height=100,
-        placeholder="Ex:\nPython: 50%\nAWS: 30%\nSoft Skills: 20%",
-        help="Ajuste le score global. Si vide, le score est équilibré."
-    )
+    # NOUVEAU : Upload de l'AO
+    uploaded_ao = st.file_uploader("📄 Télécharger l'AO (PDF)", type=['pdf'])
+    ao_text_area = st.text_area("Ou collez le texte ici", height=150, placeholder="Ex: Développeur Fullstack...")
+    
+    # Logique de sélection de l'AO
+    job_desc = ""
+    if uploaded_ao:
+        with st.spinner("Lecture de l'AO..."):
+            job_desc = extract_text_from_pdf(uploaded_ao.getvalue())
+            st.success("AO chargée depuis le PDF !")
+    elif ao_text_area:
+        job_desc = ao_text_area
+
+    st.subheader("Pondération")
+    ponderation_input = st.text_area("Poids (Optionnel)", height=80, placeholder="Python: 50%\nExp: 30%")
     
     st.divider()
     st.header("2. Les Candidats")
-    uploaded_files = st.file_uploader("PDF uniquement", type=['pdf'], accept_multiple_files=True)
+    uploaded_files = st.file_uploader("CVs (PDF)", type=['pdf'], accept_multiple_files=True)
     
-    # Bouton de reset
-    if st.button("🗑️ Réinitialiser l'analyse"):
+    if st.button("🗑️ Reset Session"):
         st.session_state.all_results = []
         st.rerun()
 
     launch_btn = st.button("⚡ Lancer l'Analyse", type="primary")
     
-    # --- AMÉLIORATION 5 : MÉTRIQUES EN TEMPS RÉEL ---
     if st.session_state.all_results:
         st.divider()
-        st.subheader("📊 Synthèse Session")
-        df_metrics = pd.DataFrame(st.session_state.all_results)
-        st.metric("Candidats traités", len(df_metrics))
-        st.metric("Score Moyen", f"{df_metrics['Score (%)'].mean():.1f}%")
+        st.metric("Candidats", len(st.session_state.all_results))
 
-# Zone Principale (Résultats)
-if launch_btn and job_desc and uploaded_files:
-    
-    if len(uploaded_files) > 20:
-        st.error("⚠️ Maximum 20 CV par lot pour des raisons de performance.")
+# Zone Principale
+if launch_btn:
+    if not job_desc:
+        st.error("⚠️ Veuillez fournir une Offre d'Emploi (PDF ou Texte).")
+    elif not uploaded_files:
+        st.error("⚠️ Veuillez charger des CVs.")
     else:
-        st.write(f"🔄 Analyse en cours de {len(uploaded_files)} dossier(s)...")
+        if len(uploaded_files) > 20:
+            st.warning("⚠️ Analyse limitée à 20 CVs pour la performance.")
+        
+        st.write(f"🔄 Analyse de {len(uploaded_files)} dossier(s)...")
         progress_bar = st.progress(0)
+        current_batch = []
         
-        # On vide les résultats précédents si nouvelle analyse lancée
-        # (Ou on peut choisir d'ajouter, ici je choisis de remplacer pour simplifier le flux)
-        current_batch_results = []
-        
-        # Boucle d'analyse
         for i, file in enumerate(uploaded_files):
-            # Lecture des bytes pour le cache
             file_bytes = file.getvalue()
             text_cv = extract_text_from_pdf(file_bytes)
             
             if text_cv:
-                # Appel de l'IA (Caché)
                 data = analyze_candidate_deep(job_desc, text_cv, ponderation_input)
                 
                 if data:
                     save_to_google_sheet(data, job_desc)
-
-                    red_flags_list = [f for f in data['comparatif']['points_faibles'] if 'red flag' in f.lower()]
-                    first_red_flag = red_flags_list[0] if red_flags_list else "Rien de critique"
                     
-                    # Structure aplatie pour le tableau et l'affichage
+                    # Gestion lien LinkedIn pour affichage propre
+                    lnk = data['infos'].get('linkedin', 'N/A')
+                    final_link = lnk if lnk != 'N/A' and lnk.startswith('http') else None
+
                     result_entry = {
                         'Nom': data['infos']['nom'],
                         'Score (%)': int(data['scores']['global']),
-                        'Exp. (ans)': data['infos']['annees_exp'],
+                        'Exp.': data['infos']['annees_exp'],
+                        'LinkedIn': final_link, # URL brute pour la colonne LinkColumn
                         'Verdict': data['analyse_skills']['verdict_technique'],
-                        'Red Flag Principal': first_red_flag,
-                        'Email': data['infos']['email'],
-                        'full_data': data # On garde tout le JSON pour l'affichage détaillé
+                        'full_data': data
                     }
-                    
-                    current_batch_results.append(result_entry)
+                    current_batch.append(result_entry)
 
-            # Mise à jour barre de progression
             progress_bar.progress((i + 1) / len(uploaded_files))
         
-        # Mise à jour du Session State
-        st.session_state.all_results = current_batch_results
+        st.session_state.all_results = current_batch
         progress_bar.empty()
-        st.success("✅ Analyse terminée !")
-        st.rerun() # Rerun pour afficher proprement les résultats stockés
+        st.rerun()
 
-# --- 5. AFFICHAGE DES RÉSULTATS (DEPUIS LE SESSION STATE) ---
+# --- 5. RÉSULTATS ---
 if st.session_state.all_results:
     
-    # Conversion en DF pour manipulation
     df = pd.DataFrame(st.session_state.all_results)
     
-    # --- AMÉLIORATION 6 : FILTRES ---
     col_filter1, col_filter2 = st.columns([1, 3])
     with col_filter1:
-        min_score = st.slider("Filtrer par Score min (%)", 0, 100, 0)
+        min_score = st.slider("Filtrer par Score (%)", 0, 100, 0)
     
-    # Filtrage
     df_filtered = df[df['Score (%)'] >= min_score].sort_values(by='Score (%)', ascending=False)
     
-    # Tableau global
-    st.header("📊 Tableau Comparatif")
+    st.subheader("📊 Tableau Comparatif")
+    
+    # Affichage avec configuration de colonne pour le LIEN LINKEDIN
     st.dataframe(
-        df_filtered.drop(columns=['full_data']), # On cache la grosse colonne JSON
-        use_container_width=True, 
-        hide_index=True
+        df_filtered.drop(columns=['full_data']),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "LinkedIn": st.column_config.LinkColumn(
+                "Profil LinkedIn",
+                help="Cliquez pour ouvrir le profil",
+                validate="^https://.*",
+                display_text="Voir Profil" # Affiche "Voir Profil" au lieu de l'URL moche
+            ),
+            "Score (%)": st.column_config.ProgressColumn(
+                "Match",
+                format="%d%%",
+                min_value=0,
+                max_value=100,
+            ),
+        }
     )
 
-    # --- AMÉLIORATION 7 : EXPORT CSV ---
+    # Export CSV
     csv = df_filtered.drop(columns=['full_data']).to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 Télécharger le rapport CSV",
-        data=csv,
-        file_name='analyse_candidats.csv',
-        mime='text/csv',
-    )
+    st.download_button("📥 CSV", csv, 'analyse.csv', 'text/csv')
     
     st.divider()
     st.header("👤 Détail des Candidats")
 
-    # Affichage des cartes détaillées (uniquement pour les filtrés)
     for index, row in df_filtered.iterrows():
-        data = row['full_data'] # Récupération du JSON complet
+        data = row['full_data']
         score = row['Score (%)']
-        color = "green" if score >= 75 else "blue" if score >= 60 else "orange" if score >= 40 else "red"
+        color = "green" if score >= 75 else "blue" if score >= 60 else "orange"
         
-        with st.expander(f"**{data['infos']['nom']}** - Match: :{color}[{score}%] - {data['infos']['poste_vise']}", expanded=False):
+        # Expander
+        with st.expander(f"**{data['infos']['nom']}** - :{color}[{score}%]", expanded=False):
             
-            # EN-TÊTE
-            c_info1, c_info2 = st.columns([2, 1])
-            with c_info1:
-                st.info(f"🧠 **Verdict:** {data['analyse_skills']['verdict_technique']}")
+            # Header Carte
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                st.info(f"🧠 {data['analyse_skills']['verdict_technique']}")
+                # Lien LinkedIn direct dans la carte aussi
+                if row['LinkedIn']:
+                    st.markdown(f"🔗 [**Voir le profil LinkedIn de {data['infos']['nom']}**]({row['LinkedIn']})")
+            
+            with c2:
+                st.caption("Red Flags détectés:")
                 if data['comparatif']['points_faibles']:
-                    st.markdown("🚩 **Alertes (Red Flags) :**")
                     for f in data['comparatif']['points_faibles']:
-                        st.error(f"- {f}")
-            with c_info2:
-                st.subheader("Historique")
-                for item in data['historique']:
-                        st.markdown(f"**{item.get('titre', 'N/A')}**")
-                        st.caption(f"{item.get('periode', 'N/A')} ({item.get('duree', 'N/A')})")
+                        if "red flag" in f.lower() or "faible" in f.lower():
+                            st.error(f"{f}")
+                        else:
+                            st.warning(f"{f}")
             
             st.divider()
-
-            # GRAPHIQUE & SKILLS
+            
+            # Radar & Skills
             c_graph, c_skills = st.columns([1, 2])
             with c_graph:
-                categories = ['Tech', 'Expérience', 'Soft Skills', 'Culture']
-                values = [data['scores']['tech_hard_skills'], data['scores']['experience'], data['scores']['soft_skills'], data['scores']['fit_culturel']]
-                fig = go.Figure(data=go.Scatterpolar(r=values, theta=categories, fill='toself', name=data['infos']['nom']))
+                categories = ['Tech', 'Exp', 'Soft', 'Culture']
+                values = [
+                    data['scores']['tech_hard_skills'], 
+                    data['scores']['experience'], 
+                    data['scores']['soft_skills'], 
+                    data['scores']['fit_culturel']
+                ]
+                fig = go.Figure(data=go.Scatterpolar(r=values, theta=categories, fill='toself'))
                 fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), height=250, margin=dict(t=20, b=20, l=40, r=40))
+                
+                # CORRECTION ID UNIQUE PLOTLY
                 st.plotly_chart(fig, use_container_width=True, key=f"radar_{index}_{data['infos']['nom']}")
-                
-            with c_skills:
-                st.subheader("Compétences Clés")
-                # Affichage en colonnes compactes
-                cols_skills = st.columns(3)
-                for idx, comp in enumerate(data['analyse_skills']['competences_matchees']):
-                    with cols_skills[idx % 3]:
-                        niveau_lower = comp.get('niveau', '').lower()
-                        color_badge = "green" if "expert" in niveau_lower else "blue" if "intermédiaire" in niveau_lower else "orange"
-                        st.markdown(f":{color_badge}[**{comp['nom']}**] ({comp['niveau']})")
-                
-                st.markdown("---")
-                st.write("❌ **Gaps / Manquants :**")
-                misses_html = "".join([f"<span style='background:#ffebee; color:#c62828; padding:4px 8px; border-radius:4px; margin:2px; display:inline-block; font-size:0.85em'>{s}</span>" for s in data['analyse_skills']['skills_missing']])
-                st.markdown(misses_html, unsafe_allow_html=True)
 
-            # ACTIONS
-            st.divider()
-            t1, t2 = st.tabs(["📧 Action Rapide", "🎤 Guide d'Entretien"])
-            with t1:
-                st.text_area("Brouillon d'email", value=data['action']['email_draft'], height=100, key=f"email_{index}")
-            with t2:
-                for q in data['action']['questions_entretien']:
-                    st.markdown(f"- ❓ {q}")
+            with c_skills:
+                st.write("**Compétences Clés :**")
+                badges = ""
+                for comp in data['analyse_skills']['competences_matchees']:
+                    color_b = "green" if "expert" in comp.get('niveau','').lower() else "blue"
+                    badges += f"<span style='color:{color_b}; font-weight:bold; border:1px solid {color_b}; padding:2px 6px; border-radius:4px; margin-right:5px'>{comp['nom']} ({comp.get('niveau','?')})</span>"
+                st.markdown(badges, unsafe_allow_html=True)
+                
+                if data['analyse_skills']['skills_missing']:
+                    st.write("**Manquants :**")
+                    st.markdown(", ".join([f"`{s}`" for s in data['analyse_skills']['skills_missing']]))
 
 elif not launch_btn and not st.session_state.all_results:
-    st.info("👈 Commencez par ajouter une offre et des CVs dans la barre latérale.")
-
+    st.info("👈 Ajoutez l'AO (PDF/Texte) et les CVs pour commencer.")
