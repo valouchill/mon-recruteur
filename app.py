@@ -313,7 +313,7 @@ if st.session_state.all_results:
                 values = [data['scores']['tech_hard_skills'], data['scores']['experience'], data['scores']['soft_skills'], data['scores']['fit_culturel']]
                 fig = go.Figure(data=go.Scatterpolar(r=values, theta=categories, fill='toself', name=data['infos']['nom']))
                 fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), height=250, margin=dict(t=20, b=20, l=40, r=40))
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, key=f"radar_{index}_{data['infos']['nom']}")
                 
             with c_skills:
                 st.subheader("Compétences Clés")
@@ -341,3 +341,4 @@ if st.session_state.all_results:
 
 elif not launch_btn and not st.session_state.all_results:
     st.info("👈 Commencez par ajouter une offre et des CVs dans la barre latérale.")
+
