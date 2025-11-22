@@ -10,21 +10,31 @@ import pandas as pd
 import io
 import time
 
-# --- 1. CONFIGURATION & STYLE CSS ---
-st.set_page_config(page_title="AI Recruiter PRO - V6.1 Single View", layout="wide", page_icon="💎")
+# --- 1. CONFIGURATION & CSS PRO ---
+st.set_page_config(page_title="AI Recruiter PRO - V7 Dashboard", layout="wide", page_icon="👔")
 
 st.markdown("""
 <style>
-    .stExpander { border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 10px; }
-    .contact-bar { background-color: #f0f2f6; padding: 12px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 15px; font-size: 0.95em; display: flex; justify-content: space-around; align-items: center; }
-    .verdict-box { background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin-bottom: 15px; color: #0d47a1; }
-    .skill-badge { display: inline-block; padding: 5px 10px; margin: 3px; border-radius: 12px; font-size: 0.85em; font-weight: 600; background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
-    .missing-badge { display: inline-block; padding: 5px 10px; margin: 3px; border-radius: 12px; font-size: 0.85em; font-weight: 600; background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
-    h4 { color: #333; border-bottom: 2px solid #f0f2f6; padding-bottom: 5px; margin-top: 20px; margin-bottom: 15px; }
+    /* Style des Headers */
+    h3 { color: #1f2937; font-weight: 700; font-size: 1.2rem; margin-top: 0px; border-bottom: 2px solid #f3f4f6; padding-bottom: 10px; }
+    h4 { color: #4b5563; font-size: 1rem; font-weight: 600; margin-top: 15px; }
+    
+    /* Badges Compétences */
+    .badge-expert { background-color: #d1fae5; color: #065f46; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: 1px solid #a7f3d0; display: inline-block; margin: 2px;}
+    .badge-inter { background-color: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: 1px solid #bfdbfe; display: inline-block; margin: 2px;}
+    .badge-junior { background-color: #f3f4f6; color: #374151; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: 1px solid #e5e7eb; display: inline-block; margin: 2px;}
+    
+    /* Boites d'alertes personnalisées */
+    .box-pro { background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 10px; border-radius: 4px; margin-bottom: 5px; color: #166534; font-size: 0.9rem; }
+    .box-con { background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 10px; border-radius: 4px; margin-bottom: 5px; color: #991b1b; font-size: 0.9rem; }
+    
+    /* Contact Info */
+    .contact-row { background: #fff; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; text-align: center; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .contact-item { margin: 0 10px; color: #4b5563; font-size: 0.9rem; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SERVICES ---
+# --- 2. UTILS & SERVICES ---
 def get_ai_client():
     try:
         if "GROQ_API_KEY" in st.secrets:
@@ -56,64 +66,49 @@ def extract_text_from_pdf(file_bytes):
         return "".join([page.extract_text() for page in reader.pages if page.extract_text()])
     except: return ""
 
-# --- 3. ANALYSE INTELLIGENTE ---
-
+# --- 3. IA INTELLIGENTE ---
 @st.cache_data(ttl=3600, show_spinner=False)
 def analyze_candidate_deep(job, cv_text, ponderation):
     client = get_ai_client()
     if not client: return None
     
-    ponderation_txt = f"PONDÉRATION: {ponderation}" if ponderation else ""
-    
     prompt = f"""
-    Tu es un Expert en Talent Acquisition.
+    Tu es un Expert Recrutement.
     
-    TACHE :
-    1. Analyse le fit CV/AO.
-    2. Extrais infos contact + VILLE + Estime SALAIRE (Tech France).
-    3. Construit un GUIDE D'ENTRETIEN structuré.
+    TACHE:
+    1. Extrais Infos + HISTORIQUE DÉTAILLÉ (Derniers postes).
+    2. Analyse Skills avec NIVEAUX (Expert/Intermédiaire/Junior).
+    3. Guide Entretien précis.
     
-    CONTEXTE SALAIRE : Estime une fourchette réaliste (ex: 45-55k) selon expérience et lieu.
+    OFFRE: {job[:2000]}
+    CV: {cv_text[:3500]}
     
-    {ponderation_txt}
-    
-    OFFRE (AO) : {job[:2000]}
-    CV CANDIDAT : {cv_text[:3500]}
-    
-    Réponds UNIQUEMENT avec ce JSON strict :
+    JSON ATTENDU (Strict):
     {{
         "infos": {{
-            "nom": "Prénom Nom",
-            "email": "Email ou N/A",
-            "tel": "Tel ou N/A",
-            "ville": "Ville (ex: Lyon)",
-            "linkedin": "URL ou N/A",
-            "annees_exp": "X ans",
-            "poste_actuel": "Titre actuel"
+            "nom": "Nom", "email": "Email", "tel": "Tel", "ville": "Ville",
+            "linkedin": "URL", "annees_exp": "X ans", "poste_actuel": "Titre"
         }},
-        "scores": {{
-            "global": 0-100,
-            "tech": 0-10,
-            "exp": 0-10,
-            "soft": 0-10,
-            "culture": 0-10
+        "scores": {{ "global": 0-100, "tech": 0-10, "exp": 0-10, "soft": 0-10, "culture": 0-10 }},
+        "market": {{ "min": 45, "max": 55, "txt": "Justif courte" }},
+        "historique": [
+            {{ "titre": "Titre Poste", "entreprise": "Boite", "duree": "2020-2023", "resume": "1 phrase clé" }},
+            {{ "titre": "Titre Poste 2", "entreprise": "Boite", "duree": "2018-2020", "resume": "1 phrase clé" }}
+        ],
+        "skills_detail": {{
+            "expert": ["Skill A", "Skill B"],
+            "intermediaire": ["Skill C"],
+            "junior": ["Skill D"],
+            "manquant": ["Skill E"]
         }},
-        "market_value": {{
-            "min_k": 45,
-            "max_k": 55,
-            "justification": "Commentaire court salaire."
+        "analyse": {{
+            "verdict": "Synthèse pro.",
+            "pros": ["Atout 1", "Atout 2"],
+            "cons": ["Risque 1", "Risque 2"]
         }},
-        "analyse_match": {{
-            "verdict_court": "Synthèse percutante.",
-            "points_forts": ["Force 1", "Force 2", "Force 3"],
-            "points_vigilance": ["Risque 1", "Risque 2"],
-            "skills_found": ["Skill A", "Skill B", "Skill C"],
-            "skills_missing": ["Skill Manquant"]
-        }},
-        "guide_entretien": {{
-            "questions_globales": [{{"q": "Question?", "attendu": "Réponse"}}],
-            "questions_techniques": [{{"q": "Question Tech?", "attendu": "Réponse Tech"}}],
-            "questions_soft_skills": [{{"q": "Question Soft?", "attendu": "Réponse Soft"}}]
+        "interview": {{
+            "tech": [{{ "q": "Question?", "a": "Réponse" }}],
+            "soft": [{{ "q": "Question?", "a": "Réponse" }}]
         }}
     }}
     """
@@ -131,34 +126,31 @@ def analyze_candidate_deep(job, cv_text, ponderation):
     return None
 
 # --- 4. FRONTEND ---
-
 if 'all_results' not in st.session_state:
     st.session_state.all_results = []
 
-st.title("💎 AI Recruiter PRO - Single View")
+st.title("👔 AI Recruiter PRO - V7")
 
 with st.sidebar:
-    st.header("1. Le Besoin")
-    uploaded_ao = st.file_uploader("AO (PDF)", type=['pdf'])
-    ao_txt = st.text_area("Ou texte AO", height=100)
+    st.header("1. Offre (AO)")
+    uploaded_ao = st.file_uploader("PDF AO", type=['pdf'])
+    ao_txt = st.text_area("Ou texte", height=100)
     job_desc = extract_text_from_pdf(uploaded_ao.getvalue()) if uploaded_ao else ao_txt
     
-    ponderation_input = st.text_area("Critères Clés", height=70)
+    ponderation_input = st.text_area("Critères", height=70)
     st.divider()
     st.header("2. Candidats")
-    uploaded_files = st.file_uploader("CVs (PDF)", type=['pdf'], accept_multiple_files=True)
+    uploaded_files = st.file_uploader("CVs", type=['pdf'], accept_multiple_files=True)
     
     if st.button("🗑️ Reset"):
         st.session_state.all_results = []
         st.rerun()
-    
-    launch_btn = st.button("⚡ Analyser", type="primary")
+    launch_btn = st.button("⚡ Analyser")
 
 if launch_btn and job_desc and uploaded_files:
-    st.write(f"Analyse de {len(uploaded_files)} profil(s)...")
+    st.write(f"Analyse de {len(uploaded_files)} profils...")
     bar = st.progress(0)
     batch_res = []
-    
     for i, file in enumerate(uploaded_files):
         txt = extract_text_from_pdf(file.getvalue())
         if txt:
@@ -175,17 +167,16 @@ if launch_btn and job_desc and uploaded_files:
                     'full': d
                 })
         bar.progress((i+1)/len(uploaded_files))
-    
     st.session_state.all_results = batch_res
     bar.empty()
     st.rerun()
 
-# --- 5. AFFICHAGE SANS ONGLETS ---
+# --- 5. AFFICHAGE DASHBOARD ---
 if st.session_state.all_results:
     df = pd.DataFrame(st.session_state.all_results)
     df = df.sort_values('Score', ascending=False)
     
-    st.subheader("📊 Tableau de Bord")
+    st.subheader("📋 Liste des Candidats")
     st.dataframe(
         df.drop(columns=['full']),
         use_container_width=True,
@@ -196,87 +187,92 @@ if st.session_state.all_results:
         }
     )
     
-    st.divider()
-    st.header("👤 Dossiers Candidats")
+    st.markdown("---")
+    st.subheader("📂 Dossiers Détaillés")
 
     for idx, row in df.iterrows():
         d = row['full']
         score = row['Score']
-        score_emoji = "🌟 Excellent" if score >= 75 else "👍 Bon" if score >= 50 else "⚠️ Moyen"
         
-        with st.expander(f"{d['infos']['nom']}  |  {score_emoji} ({score}%)  |  {d['infos'].get('poste_actuel','Candidat')}", expanded=False):
+        # HEADER DU DOSSIER
+        with st.expander(f"👤 {d['infos']['nom']} | {d['infos'].get('poste_actuel', 'N/A')} | Score: {score}%", expanded=False):
             
-            # 1. BARRE CONTACT
-            st.markdown(
-                f"""
-                <div class="contact-bar">
-                    <span>📧 {d['infos'].get('email', 'N/A')}</span>
-                    <span>📱 {d['infos'].get('tel', 'N/A')}</span>
-                    <span>📍 {d['infos'].get('ville', 'N/A')}</span>
-                    <span>🔗 <a href="{d['infos'].get('linkedin', '#')}" target="_blank">LinkedIn</a></span>
-                </div>
-                """, unsafe_allow_html=True
-            )
+            # 1. BARRE CONTACT & INFO CLÉS
+            st.markdown(f"""
+            <div class="contact-row">
+                <span class="contact-item">📧 {d['infos'].get('email')}</span>
+                <span class="contact-item">📱 {d['infos'].get('tel')}</span>
+                <span class="contact-item">📍 {d['infos'].get('ville')}</span>
+                <span class="contact-item">💰 {d['market'].get('min')} - {d['market'].get('max')} k€ (Est.)</span>
+                <span class="contact-item">🔗 <a href="{d['infos'].get('linkedin', '#')}" target="_blank">LinkedIn</a></span>
+            </div>
+            """, unsafe_allow_html=True)
 
-            # 2. BLOC STRATÉGIQUE (Verdict + Radar + Salaire)
-            c_verdict, c_radar = st.columns([2, 1])
-            
-            with c_verdict:
-                st.markdown(f"<div class='verdict-box'><b>🧠 Verdict IA :</b> {d['analyse_match']['verdict_court']}</div>", unsafe_allow_html=True)
-                
-                # Sous-colonnes pour Forces / Salaire
-                c_pros, c_market = st.columns(2)
-                with c_pros:
-                    st.markdown("**✅ Points Forts :**")
-                    for p in d['analyse_match']['points_forts']: st.markdown(f"- {p}")
-                    st.markdown("**🚨 Vigilance :**")
-                    for v in d['analyse_match']['points_vigilance']: st.markdown(f"- {v}")
-                
-                with c_market:
-                    st.markdown("**💰 Valeur Marché Estimée**")
-                    sal = d.get('market_value', {})
-                    st.metric("Salaire Brut", f"{sal.get('min_k',0)}-{sal.get('max_k',0)} k€")
-                    st.caption(sal.get('justification', ''))
+            # LAYOUT GRILLE 2 COLONNES (2/3 Gauche, 1/3 Droite)
+            col_main, col_side = st.columns([2, 1])
 
-            with c_radar:
-                # Graphique
+            # --- COLONNE PRINCIPALE (GAUCHE) ---
+            with col_main:
+                st.markdown("### 🧠 Analyse & Parcours")
+                st.info(d['analyse']['verdict'])
+                
+                # PROS / CONS CÔTE À CÔTE
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.markdown("**✅ Forces**")
+                    for p in d['analyse']['pros']: st.markdown(f"<div class='box-pro'>{p}</div>", unsafe_allow_html=True)
+                with c2:
+                    st.markdown("**🚨 Vigilance**")
+                    for c in d['analyse']['cons']: st.markdown(f"<div class='box-con'>{c}</div>", unsafe_allow_html=True)
+
+                # HISTORIQUE (RETOUR DE L'INFO PERDUE)
+                st.markdown("#### 📅 Expérience Professionnelle")
+                if d.get('historique'):
+                    for exp in d['historique']:
+                        st.markdown(f"**{exp['titre']}** chez *{exp['entreprise']}* ({exp['duree']})")
+                        st.caption(f"📝 {exp['resume']}")
+                        st.markdown("---")
+                else:
+                    st.warning("Historique non détecté dans le PDF.")
+
+                # GUIDE ENTRETIEN (INTEGRÉ EN BAS DE PAGE GAUCHE)
+                st.markdown("#### 🎤 Questions Suggérées")
+                for q in d['interview'].get('tech', [])[:2]: # Top 2 questions tech
+                    st.write(f"**Q:** {q['q']}")
+                    st.caption(f"💡 {q['a']}")
+                for q in d['interview'].get('soft', [])[:2]: # Top 2 questions soft
+                    st.write(f"**Q:** {q['q']}")
+                    st.caption(f"💡 {q['a']}")
+
+            # --- COLONNE LATÉRALE (DROITE) ---
+            with col_side:
+                st.markdown("### 📊 Métriques")
+                
+                # RADAR
                 vals = [d['scores']['tech'], d['scores']['exp'], d['scores']['soft'], d['scores']['culture']]
                 fig = go.Figure(data=go.Scatterpolar(r=vals, theta=['Tech', 'Exp', 'Soft', 'Culture'], fill='toself'))
-                fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), height=220, margin=dict(t=20, b=20, l=30, r=30))
+                fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), height=200, margin=dict(t=20, b=20, l=30, r=30))
                 st.plotly_chart(fig, use_container_width=True, key=f"radar_{idx}")
+                
+                # COMPÉTENCES DÉTAILLÉES PAR NIVEAU
+                st.markdown("#### 🛠️ Compétences")
+                
+                st.markdown("**🏆 Expert**")
+                if d['skills_detail']['expert']:
+                    for s in d['skills_detail']['expert']: st.markdown(f"<span class='badge-expert'>{s}</span>", unsafe_allow_html=True)
+                else: st.caption("Rien de notable")
 
-            # 3. BLOC TECHNIQUE (Badges)
-            st.markdown("---")
-            st.markdown("#### 🧩 Compétences Détectées")
-            
-            skills_html = ""
-            for s in d['analyse_match'].get('skills_found', []): skills_html += f"<span class='skill-badge'>{s}</span>"
-            st.markdown(skills_html if skills_html else "N/A", unsafe_allow_html=True)
-            
-            if d['analyse_match'].get('skills_missing'):
-                miss_html = "<br><b>Manquants : </b>"
-                for m in d['analyse_match'].get('skills_missing', []): miss_html += f"<span class='missing-badge'>{m}</span>"
-                st.markdown(miss_html, unsafe_allow_html=True)
+                st.markdown("**⚡ Intermédiaire**")
+                if d['skills_detail']['intermediaire']:
+                    for s in d['skills_detail']['intermediaire']: st.markdown(f"<span class='badge-inter'>{s}</span>", unsafe_allow_html=True)
+                
+                st.markdown("**🌱 Junior / Notions**")
+                if d['skills_detail']['junior']:
+                    for s in d['skills_detail']['junior']: st.markdown(f"<span class='badge-junior'>{s}</span>", unsafe_allow_html=True)
 
-            # 4. BLOC ENTRETIEN (3 Colonnes)
-            st.markdown("#### 🎤 Guide d'Entretien")
-            guide = d.get('guide_entretien', {})
-            
-            gc1, gc2, gc3 = st.columns(3)
-            
-            def show_q_col(col, title, questions):
-                with col:
-                    st.markdown(f"**{title}**")
-                    if not questions: st.caption("Aucune suggestion.")
-                    for i, q in enumerate(questions):
-                        # Clé unique pour chaque question
-                        with st.expander(f"❓ {q['q'][:40]}...", expanded=False):
-                            st.write(f"**Q:** {q['q']}")
-                            st.caption(f"💡 **Attendu:** {q['attendu']}")
-
-            show_q_col(gc1, "🌍 Parcours", guide.get('questions_globales', []))
-            show_q_col(gc2, "💻 Technique", guide.get('questions_techniques', []))
-            show_q_col(gc3, "🤝 Soft Skills", guide.get('questions_soft_skills', []))
+                st.markdown("**❌ Manquants**")
+                if d['skills_detail']['manquant']:
+                    for s in d['skills_detail']['manquant']: st.markdown(f"<span style='color:red; font-size:0.8rem'>• {s}</span>", unsafe_allow_html=True)
 
 elif not launch_btn:
-    st.info("👈 Importez vos fichiers dans la barre latérale pour commencer.")
+    st.info("👈 Menu latéral : Chargez l'AO et les CVs pour démarrer.")
