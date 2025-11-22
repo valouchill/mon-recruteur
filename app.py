@@ -9,7 +9,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import io
 import statistics
-import uuid  # <-- IMPORT ESSENTIEL POUR CORRIGER LE BUG
+import uuid
 
 # --- 0. CONFIGURATION PAGE ---
 st.set_page_config(
@@ -19,94 +19,60 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS FLAT & HARMONISÉ ---
+# --- CSS (Même style harmonisé) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-    :root {
-        --primary: #4f46e5;
-        --primary-light: #e0e7ff;
-        --text-main: #312e81;
-        --text-sub: #64748b;
-        --bg-app: #f8fafc;
-        --border: #cbd5e1;
-    }
-
+    :root { --primary: #4f46e5; --primary-light: #e0e7ff; --text-main: #312e81; --text-sub: #64748b; --bg-app: #f8fafc; --border: #cbd5e1; }
     .stApp { background-color: var(--bg-app); font-family: 'Inter', sans-serif; color: var(--text-main); }
     h1, h2, h3, h4, .stMarkdown { color: var(--text-main) !important; font-family: 'Inter', sans-serif; }
     p, li, label, .stCaption { color: var(--text-sub) !important; }
-    
     [data-testid="stSidebar"] { background-color: white; border-right: 1px solid var(--border); }
     [data-testid="stSidebar"] * { color: var(--text-main); }
     [data-testid="stSidebar"] label, [data-testid="stSidebar"] p { color: var(--text-sub) !important; }
-
-    .stTextArea textarea, .stTextInput input {
-        color: var(--text-main) !important;
-        caret-color: var(--primary) !important;
-        background-color: #f8fafc !important;
-        border: 1px solid var(--border) !important;
-    }
-    
-    div[data-testid="stExpander"] {
-        background: white; border: 1px solid var(--border); border-radius: 8px; 
-        box-shadow: none !important; margin-bottom: 16px;
-    }
-    .streamlit-expanderHeader { 
-        background-color: white !important; 
-        color: var(--text-main) !important; 
-        font-weight: 600; 
-        border-bottom: 1px solid #f1f5f9; 
-    }
+    .stTextArea textarea, .stTextInput input { color: var(--text-main) !important; caret-color: var(--primary) !important; background-color: #f8fafc !important; border: 1px solid var(--border) !important; }
+    div[data-testid="stExpander"] { background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: none !important; margin-bottom: 16px; }
+    .streamlit-expanderHeader { background-color: white !important; color: var(--text-main) !important; font-weight: 600; border-bottom: 1px solid #f1f5f9; }
     .streamlit-expanderHeader:hover { color: var(--primary) !important; }
     .streamlit-expanderHeader svg { fill: var(--text-sub) !important; }
-
     .kpi-card { background: white; padding: 20px; border: 1px solid var(--border); border-radius: 8px; text-align: center; height: 100%; }
     .kpi-val { font-size: 1.6rem; font-weight: 700; color: var(--primary); margin-bottom: 5px; }
     .kpi-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
-
     .header-row { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 15px; border-bottom: 1px solid #f1f5f9; margin-bottom: 20px; }
     .c-name { font-size: 1.3rem; font-weight: 700; color: var(--text-main); margin: 0; }
     .c-job { font-size: 0.95rem; color: var(--text-sub); margin-top: 2px; }
-    
     .score-box { background: var(--primary); color: white; padding: 8px 16px; border-radius: 6px; font-weight: 700; font-size: 1rem; }
     .pill { background: #f1f5f9; border: 1px solid #e2e8f0; color: var(--text-main); padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; margin-top: 8px; }
     .pill a { color: var(--primary) !important; text-decoration: none; font-weight: 600; }
-
     .analysis-container { border: 1px solid var(--border); background-color: #f8fafc; border-radius: 6px; padding: 15px; height: 100%; }
     .analysis-title { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-bottom: 10px; display: block; }
     .list-item { font-size: 0.9rem; margin-bottom: 6px; display: block; color: var(--text-main); }
     .txt-success { color: #15803d; }
     .txt-danger { color: #b91c1c; }
-
     .verdict { background: var(--primary-light); color: var(--text-main); padding: 15px; border-radius: 6px; font-weight: 500; font-size: 0.95rem; line-height: 1.5; border: 1px solid #c7d2fe; margin-bottom: 20px; }
-
     .tl-item { border-left: 2px solid var(--border); padding-left: 15px; margin-bottom: 20px; padding-bottom: 5px; }
     .tl-title { font-weight: 700; color: var(--text-main); font-size: 0.95rem; }
     .tl-date { font-size: 0.75rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600; margin-bottom: 5px; display: block;}
     .tl-desc { font-size: 0.9rem; color: var(--text-sub); }
-
     .skill-tag { background: white; border: 1px solid var(--border); color: var(--text-main); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 500; display: inline-block; margin: 2px; }
     .skill-tag.match { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
     .skill-tag.missing { background: #fef2f2; border-color: #fecaca; color: #991b1b; text-decoration: line-through; opacity: 0.7;}
-    
     .salary-amount { font-size: 1.5rem; font-weight: 700; color: var(--text-main); }
-
-    .question-box {
-        background-color: #f1f5f9;
-        border-left: 3px solid var(--primary);
-        padding: 12px;
-        margin-bottom: 10px;
-        border-radius: 0 6px 6px 0;
-    }
+    .question-box { background-color: #f1f5f9; border-left: 3px solid var(--primary); padding: 12px; margin-bottom: 10px; border-radius: 0 6px 6px 0; }
     .q-theme { text-transform: uppercase; font-size: 0.7rem; color: var(--primary); font-weight: 700; margin-bottom: 4px; }
     .q-text { font-weight: 600; color: var(--text-main); font-size: 0.9rem; margin-bottom: 6px; }
     .q-answer { font-size: 0.85rem; color: var(--text-sub); font-style: italic; }
+    
+    /* Correctif Uploader */
+    [data-testid="stFileUploader"] section { background-color: #f8fafc !important; border: 1px dashed var(--border) !important; }
+    [data-testid="stFileUploader"] section > div, [data-testid="stFileUploader"] section span, [data-testid="stFileUploader"] section small { color: var(--text-sub) !important; }
+    [data-testid="stFileUploader"] svg { fill: var(--text-sub) !important; }
+    [data-testid="stFileUploader"] button { color: var(--primary) !important; border-color: var(--primary) !important; background-color: white !important; }
 
 </style>
 """, unsafe_allow_html=True)
 
-# --- 1. LOGIQUE MÉTIER ---
+# --- 1. FONCTIONS ---
 
 DEFAULT_DATA = {
     "infos": {"nom": "Candidat", "email": "N/A", "tel": "N/A", "ville": "", "linkedin": "#", "poste_actuel": ""},
@@ -144,17 +110,24 @@ def get_client():
 
 def extract_pdf(file):
     try: 
-        return "\n".join([p.extract_text() for p in PdfReader(io.BytesIO(file)).pages if p.extract_text()])
-    except: return ""
+        reader = PdfReader(file)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() or ""
+        return text
+    except Exception as e: 
+        print(f"Erreur lecture PDF: {e}")
+        return ""
 
 def analyze_candidate(job, cv, criteria="", file_id=""):
     client = get_client()
-    if not client: return None
+    if not client: 
+        st.error("❌ Erreur: Client API non initialisé. Vérifiez la clé API.")
+        return None
     
-    # ID unique injecté dans le prompt pour éviter le cache implicite
     prompt = f"""
     ID_ANALYSIS: {file_id}
-    ROLE: Expert Recrutement.
+    ROLE: Expert Recrutement & Chasseur de Têtes.
     OFFRE: {job[:1500]}
     CRITERES: {criteria}
     CV: {cv[:3000]}
@@ -179,7 +152,9 @@ def analyze_candidate(job, cv, criteria="", file_id=""):
             temperature=0.1
         )
         return normalize_json(json.loads(res.choices[0].message.content))
-    except: return None
+    except Exception as e:
+        st.error(f"❌ Erreur API sur ce CV : {e}")
+        return None
 
 def save_to_sheets(data, job_desc):
     try:
@@ -198,37 +173,60 @@ with st.sidebar:
     st.markdown("### ⚙️ Paramètres")
     ao_file = st.file_uploader("1. Offre (PDF)", type='pdf', key="ao")
     ao_text_input = st.text_area("Ou texte offre", height=100)
-    job_text = extract_pdf(ao_file.getvalue()) if ao_file else ao_text_input
+    
+    # Gestion sécurisée du texte offre
+    job_text = ""
+    if ao_file:
+        job_text = extract_pdf(ao_file)
+    elif ao_text_input:
+        job_text = ao_text_input
+        
     criteria = st.text_area("2. Critères spécifiques", height=80)
     cv_files = st.file_uploader("3. CVs Candidats", type='pdf', accept_multiple_files=True)
     launch_btn = st.button("Lancer l'Analyse", type="primary", use_container_width=True)
+    
     if st.button("Reset", use_container_width=True):
         st.session_state.results = []
         st.rerun()
 
+# State init
 if 'results' not in st.session_state: st.session_state.results = []
 
-if launch_btn and job_text and cv_files:
-    res = []
-    prog = st.progress(0)
-    for i, f in enumerate(cv_files):
-        f.seek(0) # Reset file pointer
-        txt = extract_pdf(f.read())
+# --- LOGIQUE DE LANCEMENT ---
+if launch_btn:
+    # 1. Vérification des inputs AVANT de lancer
+    if not job_text:
+        st.error("⚠️ Veuillez ajouter une Offre (PDF ou Texte) avant de lancer.")
+    elif not cv_files:
+        st.error("⚠️ Veuillez ajouter au moins un CV (PDF).")
+    else:
+        # 2. Lancement si tout est OK
+        res = []
+        prog = st.progress(0)
         
-        # Génération d'un ID unique pour cette analyse
-        unique_id = str(uuid.uuid4())
-        
-        if txt and len(txt) > 50:
-            d = analyze_candidate(job_text, txt, criteria, file_id=unique_id)
-            if d: 
-                save_to_sheets(d, job_text)
-                res.append(d)
-        prog.progress((i+1)/len(cv_files))
-    prog.empty()
-    st.session_state.results = res
-    st.rerun()
+        for i, f in enumerate(cv_files):
+            # Reset du curseur fichier (CRITIQUE pour éviter les fichiers vides)
+            f.seek(0)
+            txt = extract_pdf(f)
+            
+            # ID unique
+            unique_id = str(uuid.uuid4())
+            
+            if txt and len(txt) > 50:
+                d = analyze_candidate(job_text, txt, criteria, file_id=unique_id)
+                if d: 
+                    save_to_sheets(d, job_text)
+                    res.append(d)
+            else:
+                st.warning(f"⚠️ Impossible de lire le texte de : {f.name}")
+                
+            prog.progress((i+1)/len(cv_files))
+            
+        prog.empty()
+        st.session_state.results = res
+        st.rerun()
 
-# DASHBOARD CONTENT
+# --- DASHBOARD CONTENT ---
 if not st.session_state.results:
     st.markdown("""
     <div style="text-align: center; padding: 60px 20px; color: var(--text-sub);">
@@ -260,8 +258,8 @@ else:
         i = d['infos']
         s = d['scores']
         
-        # --- FIX BUG: CLÉ UNIQUE POUR L'EXPANDER ---
-        unique_expander_key = f"exp_{idx}_{i['email']}"
+        # KEY UNIQUE POUR CHAQUE EXPANDER
+        unique_key = f"exp_{idx}_{i['nom']}_{uuid.uuid4()}"
         
         with st.expander(f"{i['nom']}  —  {s['global']}%", expanded=(idx==0)):
             
@@ -345,8 +343,8 @@ else:
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
                 )
                 
-                # --- FIX BUG: CLÉ UNIQUE POUR PLOTLY ---
-                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=f"radar_{idx}_{unique_expander_key}")
+                # KEY UNIQUE POUR PLOTLY
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=unique_key)
             
             # SKILLS
             st.markdown("#### Compétences")
