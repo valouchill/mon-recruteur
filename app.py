@@ -72,33 +72,42 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    :root { 
-        --primary: #4f46e5; 
-        --success: #10b981;
-        --warning: #f59e0b;
-        --danger: #ef4444;
-        --text-main: #312e81; 
-        --text-sub: #64748b; 
-        --bg-app: #f8fafc; 
-        --border: #cbd5e1; 
+    :root {
+        --primary: #1d4ed8; /* bleu 700, meilleur contraste */
+        --success: #16a34a; /* vert 600 */
+        --warning: #b45309; /* ambre 700 */
+        --danger:  #b91c1c; /* rouge 700 */
+        --text-main: #0f172a; /* slate 900 */
+        --text-sub:  #334155; /* slate 700 */
+        --bg-app:    #f8fafc;
+        --border:    #94a3b8; /* slate 400 */
     }
-    .stApp { background-color: var(--bg-app); }
-    .kpi-card { background: white; padding: 20px; border: 1px solid var(--border); border-radius: 8px; text-align: center; height: 100%; position: relative; }
+    .stApp { background-color: var(--bg-app); color: var(--text-main); }
+    h1, h2, h3, h4, .stMarkdown, p, li, label { color: var(--text-main) !important; }
+
+    /* KPI Cards */
+    .kpi-card { background: #ffffff; padding: 20px; border: 1px solid var(--border); border-radius: 8px; text-align: center; height: 100%; position: relative; }
     .kpi-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; border-radius: 8px 8px 0 0; }
     .kpi-card.primary::before { background: var(--primary); }
     .kpi-card.success::before { background: var(--success); }
     .kpi-card.warning::before { background: var(--warning); }
     .kpi-val { font-size: 1.6rem; font-weight: 700; color: var(--text-main); margin-bottom: 5px; }
-    .kpi-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600; }
-    .score-badge { display: inline-flex; align-items: center; justify-content: center; width: 60px; height: 60px; border-radius: 50%; font-weight: 800; font-size: 1.1rem; color: white; }
-    .score-high { background: linear-gradient(135deg, #10b981, #059669); }
-    .score-mid { background: linear-gradient(135deg, #f59e0b, #d97706); }
-    .score-low { background: linear-gradient(135deg, #ef4444, #dc2626); }
-    .verdict { background: linear-gradient(to right, #eff6ff, #ffffff); color: var(--text-main); padding: 15px; border-radius: 8px; font-weight: 500; border-left: 4px solid var(--primary); margin-bottom: 20px; }
-    .skill-tag { background: white; border: 1px solid var(--border); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; margin: 2px; display: inline-block; font-weight: 500; }
-    .match { background: #f0fdf4; border-color: #86efac; color: #166534; }
-    .missing { background: #fef2f2; border-color: #fecaca; color: #991b1b; text-decoration: line-through; opacity: 0.7;}
-    </style>
+    .kpi-label { font-size: 0.8rem; color: #475569; text-transform: uppercase; font-weight: 600; }
+
+    /* Score badge (contraste renforcé) */
+    .score-badge { display: inline-flex; align-items: center; justify-content: center; width: 60px; height: 60px; border-radius: 50%; font-weight: 800; font-size: 1.1rem; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,.45); }
+    .score-high { background: linear-gradient(135deg, #059669, #065f46); }
+    .score-mid  { background: linear-gradient(135deg, #9a3412, #7c2d12); }
+    .score-low  { background: linear-gradient(135deg, #b91c1c, #7f1d1d); }
+
+    /* Verdict lisible */
+    .verdict { background: #eef2ff; color: var(--text-main); padding: 15px; border-radius: 8px; font-weight: 500; border-left: 4px solid var(--primary); margin-bottom: 20px; }
+
+    /* Tags & skills (fond non-blanc + texte sombre) */
+    .skill-tag { background: #f1f5f9; border: 1px solid var(--border); color: var(--text-main); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; margin: 2px; display: inline-block; font-weight: 500; }
+    .match   { background: #ecfdf5; border-color: #34d399; color: #065f46; }
+    .missing { background: #fff7ed; border-color: #fdba74; color: #7c2d12; text-decoration: line-through; opacity: 1; }
+</style>
     """,
     unsafe_allow_html=True,
 )
@@ -655,7 +664,7 @@ else:
                 <div style='display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:1px solid #f1f5f9;margin-bottom:12px;'>
                     <div>
                         <h3 style='margin:0'>{i_disp.get('nom','Candidat')}</h3>
-                        <div style='color:#64748b'>{i_disp.get('poste_actuel','')} • {i_disp.get('ville','')}</div>
+                        <div style='color:#334155'>{i_disp.get('poste_actuel','')} • {i_disp.get('ville','')}</div>
                         <div style='margin-top:10px;'>
                             <span class='skill-tag'>📧 {i_disp.get('email','')}</span>
                             <span class='skill-tag'>📞 {i_disp.get('tel','')}</span>
@@ -702,9 +711,9 @@ else:
                 st.markdown(
                     f"""
                     <div style='padding:12px;border:1px solid #e2e8f0;border-radius:8px;background:white;text-align:center;'>
-                        <div style='font-size:0.75rem;color:#64748b;text-transform:uppercase;'>Salaire Estimé</div>
-                        <div style='font-size:1.5rem;font-weight:800;color:#312e81;'>{sal.get('min',0)}–{sal.get('max',0)} k€</div>
-                        <div style='font-size:0.8rem;color:#4f46e5;margin-top:4px;'>{sal.get('confiance','')}</div>
+                        <div style='font-size:0.75rem;color:#334155;text-transform:uppercase;'>Salaire Estimé</div>
+                        <div style='font-size:1.5rem;font-weight:800;color:var(--text-main);'>{sal.get('min',0)}–{sal.get('max',0)} k€</div>
+                        <div style='font-size:0.8rem;color:var(--primary);margin-top:4px;'>{sal.get('confiance','')}</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
