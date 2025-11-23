@@ -103,7 +103,6 @@ def normalize_json(raw):
 def get_client():
     """Initialise et met en cache le client API Groq."""
     try: 
-        # Vérification si la clé est présente avant d'essayer
         if "GROQ_API_KEY" not in st.secrets:
             return None
         return openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=st.secrets["GROQ_API_KEY"])
@@ -129,6 +128,7 @@ def analyze_candidate(job, cv, criteria="", file_id=""):
     if not client: 
         return None
     
+    # --- AFFINEMENT DU PROMPT DE SCORING ---
     prompt = f"""
     ID_ANALYSIS: {file_id}
     ROLE: Expert Recrutement & Chasseur de Têtes.
@@ -136,7 +136,16 @@ def analyze_candidate(job, cv, criteria="", file_id=""):
     CRITERES: {criteria}
     CV: {cv[:3000]}
     
-    TACHE: Analyse critique.
+    TACHE: Analyse critique et Scoring Détaillé.
+    
+    METHODOLOGIE DE SCORING (STRICT):
+    Le score Global est la moyenne pondérée calculée par vous (IA). L'objectif est l'adéquation au poste, pas la simple qualité du CV.
+    - SCORE GLOBAL (0-100): Moyenne des autres scores. Prioriser Tech & Expérience > Soft & Fit.
+    - SCORE TECH (0-100): Évalue la profondeur, la maîtrise et l'alignement des compétences techniques du CV avec les exigences strictes de l'OFFRE et des CRITERES. 
+    - SCORE EXPERIENCE (0-100): Évalue la pertinence des rôles précédents, la durée dans des fonctions similaires, et la taille/le type d'entreprise par rapport aux attentes du poste.
+    - SCORE SOFT (0-100): Évalue les qualités comportementales (leadership, autonomie, communication) déduites des descriptions de missions du CV par rapport au profil de rôle idéal.
+    - SCORE FIT (0-100): Évalue l'adéquation géographique, les attentes salariales (si déduites), et l'alignement de la trajectoire professionnelle/motivation avec l'opportunité.
+
     JSON STRICT:
     {{
         "infos": {{ "nom": "Prénom Nom", "email": "...", "tel": "...", "ville": "...", "linkedin": "...", "poste_actuel": "..." }},
@@ -157,7 +166,6 @@ def analyze_candidate(job, cv, criteria="", file_id=""):
         )
         return normalize_json(json.loads(res.choices[0].message.content))
     except Exception as e:
-        # Affichage de l'erreur API spécifique si l'appel échoue
         st.error(f"❌ Erreur API Groq lors de l'analyse du CV : {e}")
         return None
 
@@ -183,7 +191,6 @@ with st.sidebar:
     # Gestion sécurisée du texte offre
     job_text = ""
     if ao_file:
-        # FIX CRITIQUE: Réinitialiser le pointeur du fichier avant de le lire
         ao_file.seek(0) 
         job_text = extract_pdf(ao_file)
     elif ao_text_input:
@@ -215,11 +222,9 @@ if launch_btn:
         prog = st.progress(0)
         
         for i, f in enumerate(cv_files):
-            # Réinitialisation du curseur fichier (CRITIQUE)
             f.seek(0)
             txt = extract_pdf(f)
             
-            # ID unique pour éviter les duplicatas et forcer l'analyse
             unique_id = str(uuid.uuid4())
             
             if txt and len(txt) > 50:
@@ -234,7 +239,6 @@ if launch_btn:
             
         prog.empty()
         st.session_state.results = res
-        # Forcer le rafraîchissement de l'interface pour afficher les résultats
         st.rerun()
 
 # --- DASHBOARD CONTENT ---
@@ -273,7 +277,6 @@ else:
         i = d['infos']
         s = d['scores']
         
-        # KEY UNIQUE POUR CHAQUE EXPANDER
         unique_key = f"exp_{idx}_{i['nom']}_{uuid.uuid4()}"
         
         with st.expander(f"{i['nom']}  —  {s['global']}%", expanded=(idx==0)):
@@ -358,7 +361,6 @@ else:
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
                 )
                 
-                # KEY UNIQUE POUR PLOTLY
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=unique_key)
             
             # SKILLS
