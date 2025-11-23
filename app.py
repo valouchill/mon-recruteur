@@ -128,7 +128,7 @@ def analyze_candidate(job, cv, criteria="", file_id=""):
     if not client: 
         return None
     
-    # --- AFFINEMENT DU PROMPT DE SCORING ---
+    # --- PROMPT AVEC MÉTHODOLOGIE DE SCORING ET SALAIRE AFFINÉE ---
     prompt = f"""
     ID_ANALYSIS: {file_id}
     ROLE: Expert Recrutement & Chasseur de Têtes.
@@ -146,11 +146,19 @@ def analyze_candidate(job, cv, criteria="", file_id=""):
     - SCORE SOFT (0-100): Évalue les qualités comportementales (leadership, autonomie, communication) déduites des descriptions de missions du CV par rapport au profil de rôle idéal.
     - SCORE FIT (0-100): Évalue l'adéquation géographique, les attentes salariales (si déduites), et l'alignement de la trajectoire professionnelle/motivation avec l'opportunité.
 
+    ÉVALUATION SALARIALE (SALAIRE):
+    - Estimer la fourchette salariale annuelle brute (min-max en k€, exemple 45-55) pour le profil en se basant sur :
+        1. **Niveau d'Expérience et Rôle :** Nombre d'années et pertinence des responsabilités par rapport à la séniorité exigée.
+        2. **Rareté des Compétences :** Rareté et demande des compétences techniques MATCHÉES au poste et non facilement trouvables.
+        3. **Localisation :** Le coût de la vie/marché local pour la ville ou la région mentionnée dans le CV.
+    - CONFIANCE (Haute/Moyenne/Basse) : La confiance doit refléter la clarté du parcours, la quantité d'informations salariales déductibles et la standardisation du marché pour ce rôle.
+    - ANALYSE : Court commentaire (max 1 ligne) justifiant l'estimation (ex: "Séniorité confirmée et compétences rares en X justifient une fourchette haute.").
+
     JSON STRICT:
     {{
         "infos": {{ "nom": "Prénom Nom", "email": "...", "tel": "...", "ville": "...", "linkedin": "...", "poste_actuel": "..." }},
         "scores": {{ "global": 0-100, "tech": 0-100, "experience": 0-100, "soft": 0-100, "fit": 0-100 }},
-        "salaire": {{ "min": int, "max": int, "confiance": "Haute/Basse", "analyse": "Court commentaire" }},
+        "salaire": {{ "min": int, "max": int, "confiance": "Haute/Moyenne/Basse", "analyse": "Court commentaire justifiant l'estimation" }},
         "competences": {{ "match": ["Skill A", "Skill B"], "manquant": ["Skill C"] }},
         "analyse": {{ "verdict": "Synthèse objective (2 lignes).", "points_forts": ["Point A"], "points_faibles": ["Point B"] }},
         "historique": [ {{ "titre": "...", "entreprise": "...", "duree": "...", "resume_synthetique": "Action." }} ],
@@ -345,6 +353,7 @@ else:
                     <div style="font-size:0.75rem; color:var(--text-sub); text-transform:uppercase; font-weight:600;">Est. Salaire</div>
                     <div class="salary-amount">{d['salaire']['min']}-{d['salaire']['max']} k€</div>
                     <div style="font-size:0.8rem; color:var(--primary);">{d['salaire']['confiance']}</div>
+                    <div style="font-size:0.7rem; color:var(--text-sub); margin-top:5px; font-style: italic;">{d['salaire']['analyse']}</div>
                 </div>
                 """, unsafe_allow_html=True)
                 
