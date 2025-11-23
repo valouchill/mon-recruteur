@@ -6,9 +6,10 @@ import plotly.graph_objects as go
 import datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import pandas as pd
+import io
 import statistics
 import uuid
-import io
 
 # --- 0. CONFIGURATION PAGE ---
 st.set_page_config(
@@ -18,57 +19,44 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS (Même style harmonisé) ---
+# --- CSS (DESIGN SYSTEM) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    :root { --primary: #4f46e5; --primary-light: #e0e7ff; --text-main: #312e81; --text-sub: #64748b; --bg-app: #f8fafc; --border: #cbd5e1; }
+    :root { --primary: #4f46e5; --text-main: #312e81; --text-sub: #64748b; --bg-app: #f8fafc; --border: #cbd5e1; }
     .stApp { background-color: var(--bg-app); font-family: 'Inter', sans-serif; color: var(--text-main); }
     h1, h2, h3, h4, .stMarkdown { color: var(--text-main) !important; font-family: 'Inter', sans-serif; }
     p, li, label, .stCaption { color: var(--text-sub) !important; }
     [data-testid="stSidebar"] { background-color: white; border-right: 1px solid var(--border); }
-    [data-testid="stSidebar"] * { color: var(--text-main); }
-    [data-testid="stSidebar"] label, [data-testid="stSidebar"] p { color: var(--text-sub) !important; }
-    .stTextArea textarea, .stTextInput input { color: var(--text-main) !important; caret-color: var(--primary) !important; background-color: #f8fafc !important; border: 1px solid var(--border) !important; }
-    div[data-testid="stExpander"] { background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: none !important; margin-bottom: 16px; }
-    .streamlit-expanderHeader { background-color: white !important; color: var(--text-main) !important; font-weight: 600; border-bottom: 1px solid #f1f5f9; }
-    .streamlit-expanderHeader:hover { color: var(--primary) !important; }
-    .streamlit-expanderHeader svg { fill: var(--text-sub) !important; }
+    [data-testid="stExpander"] { background: white; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .streamlit-expanderHeader { background-color: white !important; color: var(--text-main) !important; font-weight: 600; }
     .kpi-card { background: white; padding: 20px; border: 1px solid var(--border); border-radius: 8px; text-align: center; height: 100%; }
     .kpi-val { font-size: 1.6rem; font-weight: 700; color: var(--primary); margin-bottom: 5px; }
-    .kpi-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+    .kpi-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600; }
     .header-row { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 15px; border-bottom: 1px solid #f1f5f9; margin-bottom: 20px; }
     .c-name { font-size: 1.3rem; font-weight: 700; color: var(--text-main); margin: 0; }
-    .c-job { font-size: 0.95rem; color: var(--text-sub); margin-top: 2px; }
     .score-box { background: var(--primary); color: white; padding: 8px 16px; border-radius: 6px; font-weight: 700; font-size: 1rem; }
-    .pill { background: #f1f5f9; border: 1px solid #e2e8f0; color: var(--text-main); padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; margin-top: 8px; }
-    .pill a { color: var(--primary) !important; text-decoration: none; font-weight: 600; }
+    .pill { background: #f1f5f9; border: 1px solid #e2e8f0; color: var(--text-main); padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 500; display: inline-flex; gap: 6px; margin-right: 8px; }
     .analysis-container { border: 1px solid var(--border); background-color: #f8fafc; border-radius: 6px; padding: 15px; height: 100%; }
-    .analysis-title { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-bottom: 10px; display: block; }
     .list-item { font-size: 0.9rem; margin-bottom: 6px; display: block; color: var(--text-main); }
-    .txt-success { color: #15803d; }
-    .txt-danger { color: #b91c1c; }
-    .verdict { background: var(--primary-light); color: var(--text-main); padding: 15px; border-radius: 6px; font-weight: 500; font-size: 0.95rem; line-height: 1.5; border: 1px solid #c7d2fe; margin-bottom: 20px; }
-    .tl-item { border-left: 2px solid var(--border); padding-left: 15px; margin-bottom: 20px; padding-bottom: 5px; }
+    .txt-success { color: #15803d; } .txt-danger { color: #b91c1c; }
+    .verdict { background: #e0e7ff; color: var(--text-main); padding: 15px; border-radius: 6px; font-weight: 500; border-left: 4px solid var(--primary); margin-bottom: 20px; }
+    .tl-item { border-left: 2px solid var(--border); padding-left: 15px; margin-bottom: 20px; }
     .tl-title { font-weight: 700; color: var(--text-main); font-size: 0.95rem; }
-    .tl-date { font-size: 0.75rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600; margin-bottom: 5px; display: block;}
-    .tl-desc { font-size: 0.9rem; color: var(--text-sub); }
-    .skill-tag { background: white; border: 1px solid var(--border); color: var(--text-main); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 500; display: inline-block; margin: 2px; }
-    .skill-tag.match { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
-    .skill-tag.missing { background: #fef2f2; border-color: #fecaca; color: #991b1b; text-decoration: line-through; opacity: 0.7;}
+    .tl-date { font-size: 0.75rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600; }
+    .tl-desc { font-size: 0.9rem; color: var(--text-sub); font-style: italic; margin-top: 4px; }
+    .skill-tag { background: white; border: 1px solid var(--border); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; margin: 2px; display: inline-block; }
+    .match { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+    .missing { background: #fef2f2; border-color: #fecaca; color: #991b1b; text-decoration: line-through; opacity: 0.7;}
     .salary-amount { font-size: 1.5rem; font-weight: 700; color: var(--text-main); }
     .question-box { background-color: #f1f5f9; border-left: 3px solid var(--primary); padding: 12px; margin-bottom: 10px; border-radius: 0 6px 6px 0; }
     .q-theme { text-transform: uppercase; font-size: 0.7rem; color: var(--primary); font-weight: 700; margin-bottom: 4px; }
     .q-text { font-weight: 600; color: var(--text-main); font-size: 0.9rem; margin-bottom: 6px; }
     .q-answer { font-size: 0.85rem; color: var(--text-sub); font-style: italic; }
-    [data-testid="stFileUploader"] section { background-color: #f8fafc !important; border: 1px dashed var(--border) !important; }
-    [data-testid="stFileUploader"] section > div, [data-testid="stFileUploader"] section span, [data-testid="stFileUploader"] section small { color: var(--text-sub) !important; }
-    [data-testid="stFileUploader"] svg { fill: var(--text-sub) !important; }
-    [data-testid="stFileUploader"] button { color: var(--primary) !important; border-color: var(--primary) !important; background-color: white !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 1. FONCTIONS ---
+# --- 1. LOGIQUE MÉTIER ---
 
 DEFAULT_DATA = {
     "infos": {"nom": "Candidat", "email": "N/A", "tel": "N/A", "ville": "", "linkedin": "#", "poste_actuel": ""},
@@ -101,19 +89,19 @@ def normalize_json(raw):
 
 @st.cache_resource
 def get_client():
-    """Initialise et met en cache le client API Groq."""
-    try: 
-        if "GROQ_API_KEY" not in st.secrets:
-            return None
-        return openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=st.secrets["GROQ_API_KEY"])
-    except Exception as e:
-        print(f"Erreur d'initialisation du client Groq: {e}")
-        return None
+    try: return openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=st.secrets["GROQ_API_KEY"])
+    except: return None
 
-def extract_pdf(file_or_bytes):
-    """Extrait le texte d'un objet fichier PDF ou de ses bytes."""
+# --- CORRECTION CRITIQUE LECTURE PDF ---
+def extract_pdf_from_bytes(file_bytes):
+    """
+    Crée un flux BytesIO frais pour chaque fichier.
+    C'est ici que la duplication est évitée.
+    """
     try: 
-        reader = PdfReader(file_or_bytes)
+        # On crée un NOUVEL objet BytesIO à chaque appel avec les données brutes
+        stream = io.BytesIO(file_bytes)
+        reader = PdfReader(stream)
         text = ""
         for page in reader.pages:
             text += page.extract_text() or ""
@@ -122,55 +110,40 @@ def extract_pdf(file_or_bytes):
         print(f"Erreur lecture PDF: {e}")
         return ""
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def analyze_candidate(job, cv, criteria="", file_id=""):
-    """Appelle l'API Groq pour analyser le CV."""
     client = get_client()
-    if not client: 
-        return None
+    if not client: return None
     
-    # --- PROMPT AVEC MÉTHODOLOGIE DE SCORING ET SALAIRE AFFINÉE ---
+    # --- RETOUR DU PROMPT "EXPERT" (SCORING FIABLE) ---
     prompt = f"""
     ID_ANALYSIS: {file_id}
-    ROLE: Expert Recrutement & Chasseur de Têtes.
+    ROLE: Expert Recrutement.
     OFFRE: {job[:1500]}
     CRITERES: {criteria}
-    CV: {cv[:3000]}
+    CV: {cv[:3500]}
     
-    TACHE: Analyse critique et Scoring Détaillé.
+    TACHE: Analyse critique.
     
-    METHODOLOGIE DE SCORING (STRICT):
-    Le score Global est la moyenne pondérée calculée par vous (IA). L'objectif est l'adéquation au poste, pas la simple qualité du CV.
-    - SCORE GLOBAL (0-100): Moyenne des autres scores. Prioriser Tech & Expérience > Soft & Fit.
-    - SCORE TECH (0-100): Évalue la profondeur, la maîtrise et l'alignement des compétences techniques du CV avec les exigences strictes de l'OFFRE et des CRITERES. 
-    - SCORE EXPERIENCE (0-100): Évalue la pertinence des rôles précédents, la durée dans des fonctions similaires, et la taille/le type d'entreprise par rapport aux attentes du poste.
-    - SCORE SOFT (0-100): Évalue les qualités comportementales (leadership, autonomie, communication) déduites des descriptions de missions du CV par rapport au profil de rôle idéal.
-    - SCORE FIT (0-100): Évalue l'adéquation géographique, les attentes salariales (si déduites), et l'alignement de la trajectoire professionnelle/motivation avec l'opportunité.
-
-    ÉVALUATION SALARIALE (SALAIRE):
-    - Estimer la fourchette salariale annuelle brute (min-max en k€, exemple 45-55) pour le profil en se basant sur :
-        1. **Niveau d'Expérience et Rôle :** Nombre d'années et pertinence des responsabilités par rapport à la séniorité exigée.
-        2. **Rareté des Compétences :** Rareté et demande des compétences techniques MATCHÉES au poste et non facilement trouvables.
-        3. **Localisation :** Le coût de la vie/marché local pour la ville ou la région mentionnée dans le CV.
-    - CONFIANCE (Haute/Moyenne/Basse) : La confiance doit refléter la clarté du parcours, la quantité d'informations salariales déductibles et la standardisation du marché pour ce rôle.
-    - ANALYSE : Court commentaire (max 1 ligne) justifiant l'estimation.
-
-    QUESTIONS D'ENTRETIEN (ENTRETIEN):
-    - **Générer exactement 6 questions de challenge** basées sur le CV, l'OFFRE et les CRITERES.
-    - La structure doit être:
-        - **2 questions** avec le "theme": "**Technique**" (pour valider les compétences clés).
-        - **2 questions** avec le "theme": "**Soft Skill**" (pour évaluer le comportement et le management).
-        - **2 questions** avec le "theme": "**Challenge**" ou "**Motivation**" (pour évaluer la résilience et l'ambition).
-    - Pour chaque question, l'"attendu" doit indiquer brièvement la réponse idéale du candidat.
-
+    1. SCORING (Pondéré et Sévère) :
+       - GLOBAL (0-100) : Moyenne pondérée de Tech (40%), Expérience (30%), Soft (15%), Fit (15%).
+       - Ne donne pas 80% par défaut. Si le candidat n'a pas les mots-clés exacts de l'offre, note < 50%.
+    
+    2. SALAIRE :
+       - Estime la fourchette (k€ brut annuel) selon l'expérience (Junior/Senior) et le lieu (Paris vs Province).
+    
+    3. HISTORIQUE :
+       - Résume les 2 dernières expériences en 2 lignes max ("resume_synthetique").
+    
     JSON STRICT:
     {{
         "infos": {{ "nom": "Prénom Nom", "email": "...", "tel": "...", "ville": "...", "linkedin": "...", "poste_actuel": "..." }},
         "scores": {{ "global": 0-100, "tech": 0-100, "experience": 0-100, "soft": 0-100, "fit": 0-100 }},
-        "salaire": {{ "min": int, "max": int, "confiance": "Haute/Moyenne/Basse", "analyse": "Court commentaire justifiant l'estimation" }},
-        "competences": {{ "match": ["Skill A", "Skill B"], "manquant": ["Skill C"] }},
-        "analyse": {{ "verdict": "Synthèse objective (2 lignes).", "points_forts": ["Point A"], "points_faibles": ["Point B"] }},
-        "historique": [ {{ "titre": "...", "entreprise": "...", "duree": "...", "resume_synthetique": "Action." }} ],
-        "entretien": [ {{ "theme": "Challenge", "question": "Question", "attendu": "Reponse" }} ]
+        "salaire": {{ "min": int, "max": int, "confiance": "Haute/Basse", "analyse": "..." }},
+        "competences": {{ "match": ["Skill A"], "manquant": ["Skill B"] }},
+        "analyse": {{ "verdict": "Synthèse (2 lignes).", "points_forts": ["A"], "points_faibles": ["B"] }},
+        "historique": [ {{ "titre": "...", "entreprise": "...", "duree": "...", "resume_synthetique": "..." }} ],
+        "entretien": [ {{ "theme": "...", "question": "...", "attendu": "..." }} ]
     }}
     """
     try:
@@ -181,12 +154,10 @@ def analyze_candidate(job, cv, criteria="", file_id=""):
             temperature=0.1
         )
         return normalize_json(json.loads(res.choices[0].message.content))
-    except Exception as e:
-        st.error(f"❌ Erreur API Groq lors de l'analyse du CV : {e}")
+    except Exception:
         return None
 
 def save_to_sheets(data, job_desc):
-    """Sauvegarde les résultats (omise ici pour la simplicité, mais le code reste pour l'implémentation)."""
     try:
         if "gcp_service_account" in st.secrets:
             scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -204,107 +175,94 @@ with st.sidebar:
     ao_file = st.file_uploader("1. Offre (PDF)", type='pdf', key="ao")
     ao_text_input = st.text_area("Ou texte offre", height=100)
     
-    # Gestion sécurisée du texte offre
     job_text = ""
-    if ao_file:
-        ao_file.seek(0) 
-        job_text = extract_pdf(ao_file)
-    elif ao_text_input:
+    if ao_file: 
+        # Lecture immédiate des bytes pour l'AO aussi
+        job_text = extract_pdf_from_bytes(ao_file.getvalue())
+    elif ao_text_input: 
         job_text = ao_text_input
         
     criteria = st.text_area("2. Critères spécifiques", height=80)
     cv_files = st.file_uploader("3. CVs Candidats", type='pdf', accept_multiple_files=True)
+    
     launch_btn = st.button("Lancer l'Analyse", type="primary", use_container_width=True)
     
     if st.button("Reset", use_container_width=True):
         st.session_state.results = []
         st.rerun()
 
-# State init
 if 'results' not in st.session_state: st.session_state.results = []
 
-# --- LOGIQUE DE LANCEMENT ---
+# --- LOGIQUE PRINCIPALE (CORRIGÉE MULTI-FICHIERS) ---
 if launch_btn:
-    # 1. Vérification des inputs AVANT de lancer
-    if get_client() is None:
-        st.error("❌ Le client API Groq n'a pas pu être initialisé. Vérifiez que la clé `GROQ_API_KEY` est bien définie dans Streamlit Secrets.")
-    elif not job_text or len(job_text) < 50:
-        st.error("⚠️ Veuillez ajouter une **Offre (PDF ou Texte)** valide (au moins 50 caractères) avant de lancer.")
+    if not job_text:
+        st.error("⚠️ Veuillez ajouter une Offre.")
     elif not cv_files:
-        st.error("⚠️ Veuillez ajouter au moins un **CV (PDF)**.")
+        st.error("⚠️ Veuillez ajouter des CVs.")
     else:
-        # 2. Lancement si tout est OK
-        res = []
-        prog = st.progress(0)
+        new_results = []
+        progress_bar = st.progress(0)
         
-        for i, f in enumerate(cv_files):
-            f.seek(0)
-            txt = extract_pdf(f)
+        for i, file_obj in enumerate(cv_files):
+            # --- CORRECTION MAJEURE ICI ---
+            # On lit les bytes bruts du fichier Uploader
+            # Cela crée une copie en mémoire indépendante pour chaque tour de boucle
+            file_bytes = file_obj.getvalue()
             
-            unique_id = str(uuid.uuid4())
+            # Extraction du texte depuis ces bytes frais
+            cv_text = extract_pdf_from_bytes(file_bytes)
             
-            if txt and len(txt) > 50:
-                d = analyze_candidate(job_text, txt, criteria, file_id=unique_id)
-                if d: 
-                    save_to_sheets(d, job_text)
-                    res.append(d)
-            else:
-                st.warning(f"⚠️ Impossible de lire le texte de : {f.name} (fichier potentiellement vide ou illisible).")
+            if cv_text and len(cv_text) > 50:
+                # L'ID unique permet d'éviter les conflits de cache
+                unique_id = str(uuid.uuid4())
                 
-            prog.progress((i+1)/len(cv_files))
+                data = analyze_candidate(job_text, cv_text, criteria, file_id=unique_id)
+                if data: 
+                    save_to_sheets(data, job_text)
+                    new_results.append(data)
             
-        prog.empty()
-        st.session_state.results = res
+            progress_bar.progress((i + 1) / len(cv_files))
+            
+        progress_bar.empty()
+        st.session_state.results = new_results
         st.rerun()
 
 # --- DASHBOARD CONTENT ---
 if not st.session_state.results:
     st.markdown("""
     <div style="text-align: center; padding: 60px 20px; color: var(--text-sub);">
-        <h1 style="color: var(--text-main);">Bienvenue sur AI Recruiter</h1>
-        <p>Interface simplifiée pour l'analyse de candidatures.</p>
-        <div style="margin-top: 40px; display: inline-flex; gap: 20px;">
-            <div style="border:1px solid #e2e8f0; padding:20px; border-radius:8px; width:180px; color: var(--text-main);">📂 Importez l'Offre</div>
-            <div style="border:1px solid #e2e8f0; padding:20px; border-radius:8px; width:180px; color: var(--text-main);">📄 Ajoutez les CVs</div>
-            <div style="border:1px solid #e2e8f0; padding:20px; border-radius:8px; width:180px; color: var(--text-main);">📊 Analysez</div>
-        </div>
+        <h1 style="color: var(--text-main);">Bienvenue sur AI Recruiter PRO</h1>
+        <p>Importez une offre et des CVs pour commencer.</p>
     </div>
     """, unsafe_allow_html=True)
 
 else:
-    # KPI TOP
     sorted_res = sorted(st.session_state.results, key=lambda x: x['scores']['global'], reverse=True)
-    if not sorted_res:
-        st.warning("Aucun résultat d'analyse n'a pu être généré. Veuillez vérifier la qualité de vos fichiers PDF.")
-        st.stop()
-        
-    avg = int(statistics.mean([r['scores']['global'] for r in sorted_res]))
+    avg = int(statistics.mean([r['scores']['global'] for r in sorted_res])) if sorted_res else 0
     
-    col1, col2, col3, col4 = st.columns(4)
-    col1.markdown(f"""<div class="kpi-card"><div class="kpi-val">{len(sorted_res)}</div><div class="kpi-label">Dossiers</div></div>""", unsafe_allow_html=True)
-    col2.markdown(f"""<div class="kpi-card"><div class="kpi-val">{avg}%</div><div class="kpi-label">Score Moyen</div></div>""", unsafe_allow_html=True)
-    col3.markdown(f"""<div class="kpi-card"><div class="kpi-val">{len([x for x in sorted_res if x['scores']['global']>=70])}</div><div class="kpi-label">Qualifiés</div></div>""", unsafe_allow_html=True)
-    col4.markdown(f"""<div class="kpi-card"><div class="kpi-val">{sorted_res[0]['scores']['global']}%</div><div class="kpi-label">Top Score</div></div>""", unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.markdown(f"""<div class="kpi-card"><div class="kpi-val">{len(sorted_res)}</div><div class="kpi-label">Dossiers</div></div>""", unsafe_allow_html=True)
+    c2.markdown(f"""<div class="kpi-card"><div class="kpi-val">{avg}%</div><div class="kpi-label">Moyenne</div></div>""", unsafe_allow_html=True)
+    c3.markdown(f"""<div class="kpi-card"><div class="kpi-val">{len([x for x in sorted_res if x['scores']['global']>=70])}</div><div class="kpi-label">Qualifiés</div></div>""", unsafe_allow_html=True)
+    c4.markdown(f"""<div class="kpi-card"><div class="kpi-val">{sorted_res[0]['scores']['global']}%</div><div class="kpi-label">Top Score</div></div>""", unsafe_allow_html=True)
     
     st.write("") 
 
-    # LISTE CANDIDATS
     for idx, d in enumerate(sorted_res):
         i = d['infos']
         s = d['scores']
-        
-        unique_key = f"exp_{idx}_{i['nom']}_{uuid.uuid4()}"
+        # Clé unique pour les widgets Streamlit dans la boucle
+        unique_key = f"chart_{idx}_{uuid.uuid4()}"
         
         with st.expander(f"{i['nom']}  —  {s['global']}%", expanded=(idx==0)):
             
-            # HEADER
             st.markdown(f"""
             <div class="header-row">
                 <div>
                     <h3 class="c-name">{i['nom']}</h3>
                     <div class="c-job">{i['poste_actuel']} • {i['ville']}</div>
                     <div style="margin-top:10px;">
-                        <span class="pill">📧 <a href="mailto:{i['email']}">{i['email']}</a></span>
+                        <span class="pill">📧 {i['email']}</span>
                         <span class="pill">📞 {i['tel']}</span>
                         <span class="pill">🔗 <a href="{i['linkedin']}" target="_blank">LinkedIn</a></span>
                     </div>
@@ -313,32 +271,18 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
-            # VERDICT
             st.markdown(f"""<div class="verdict">{d['analyse']['verdict']}</div>""", unsafe_allow_html=True)
             
-            # GRID ANALYSE
-            c1, c2 = st.columns(2)
-            with c1:
-                forces_html = "".join([f"<span class='list-item'>+ {f}</span>" for f in d['analyse']['points_forts'][:4]])
-                st.markdown(f"""
-                <div class="analysis-container">
-                    <span class="analysis-title txt-success">✅ Points Forts</span>
-                    {forces_html}
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with c2:
-                faiblesses_html = "".join([f"<span class='list-item'>- {f}</span>" for f in d['analyse']['points_faibles'][:4]])
-                st.markdown(f"""
-                <div class="analysis-container">
-                    <span class="analysis-title txt-danger">⚠️ Points de Vigilance</span>
-                    {faiblesses_html}
-                </div>
-                """, unsafe_allow_html=True)
+            gc1, gc2 = st.columns(2)
+            with gc1:
+                forces = "".join([f"<span class='list-item'>+ {f}</span>" for f in d['analyse']['points_forts'][:4]])
+                st.markdown(f"<div class='analysis-container'><span class='analysis-title txt-success'>✅ Forces</span>{forces}</div>", unsafe_allow_html=True)
+            with gc2:
+                faibles = "".join([f"<span class='list-item'>- {f}</span>" for f in d['analyse']['points_faibles'][:4]])
+                st.markdown(f"<div class='analysis-container'><span class='analysis-title txt-danger'>⚠️ Vigilance</span>{faibles}</div>", unsafe_allow_html=True)
             
             st.divider()
             
-            # DETAILS & DATA
             col_g, col_d = st.columns([2, 1])
             with col_g:
                 st.markdown("#### 📅 Parcours")
@@ -358,57 +302,28 @@ else:
             with col_d:
                 st.markdown(f"""
                 <div style="padding:15px; border:1px solid #e2e8f0; border-radius:8px; text-align:center; margin-bottom:20px; background: white;">
-                    <div style="font-size:0.75rem; color:var(--text-sub); text-transform:uppercase; font-weight:600;">Est. Salaire</div>
+                    <div style="font-size:0.75rem; color:var(--text-sub); text-transform:uppercase; font-weight:600;">Salaire Est.</div>
                     <div class="salary-amount">{d['salaire']['min']}-{d['salaire']['max']} k€</div>
                     <div style="font-size:0.8rem; color:var(--primary);">{d['salaire']['confiance']}</div>
-                    <div style="font-size:0.7rem; color:var(--text-sub); margin-top:5px; font-style: italic;">{d['salaire']['analyse']}</div>
                 </div>
                 """, unsafe_allow_html=True)
                 
                 cat = ['Tech', 'Exp', 'Soft', 'Fit', 'Tech']
                 val = [s['tech'], s['experience'], s['soft'], s['fit'], s['tech']]
-                fig = go.Figure(go.Scatterpolar(
-                    r=val, theta=cat, fill='toself',
-                    line_color='#4f46e5', fillcolor='rgba(79, 70, 229, 0.1)'
-                ))
+                fig = go.Figure(go.Scatterpolar(r=val, theta=cat, fill='toself', line_color='#4f46e5', fillcolor='rgba(79, 70, 229, 0.1)'))
                 fig.update_layout(
-                    polar=dict(radialaxis=dict(visible=True, range=[0, 100], showticklabels=False, linecolor='rgba(0,0,0,0)'),
-                               angularaxis=dict(tickfont=dict(size=10, color='#64748b'))),
-                    showlegend=False, margin=dict(t=20, b=20, l=30, r=30), height=220,
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+                    polar=dict(radialaxis=dict(visible=True, range=[0, 100], showticklabels=False, linecolor='rgba(0,0,0,0)'), angularaxis=dict(tickfont=dict(size=10, color='#64748b'))),
+                    showlegend=False, margin=dict(t=20, b=20, l=30, r=30), height=220, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
                 )
-                
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=unique_key)
             
-            # SKILLS
             st.markdown("#### Compétences")
             skills_html = ""
-            for sk in d['competences']['match']:
-                skills_html += f"<span class='skill-tag match'>✓ {sk}</span>"
-            for sk in d['competences']['manquant']:
-                skills_html += f"<span class='skill-tag missing'>{sk}</span>"
+            for sk in d['competences']['match']: skills_html += f"<span class='skill-tag match'>✓ {sk}</span>"
+            for sk in d['competences']['manquant']: skills_html += f"<span class='skill-tag missing'>{sk}</span>"
             st.markdown(skills_html, unsafe_allow_html=True)
             
-            st.divider()
-
-            # CHALLENGE QUESTIONS
-            st.markdown("#### 🎯 Challenge & Entretien")
-            
-            q_col1, q_col2 = st.columns(2)
-            for i, q in enumerate(d['entretien']):
-                target_col = q_col1 if i % 2 == 0 else q_col2
-                with target_col:
-                    # Ajout d'une logique pour adapter le style basé sur le thème
-                    theme_color = 'var(--primary)'
-                    if q.get('theme') == 'Technique':
-                        theme_color = '#059669' # Vert
-                    elif q.get('theme') == 'Soft Skill':
-                        theme_color = '#f97316' # Orange
-                    
-                    st.markdown(f"""
-                    <div class="question-box" style="border-left-color: {theme_color};">
-                        <div class="q-theme" style="color: {theme_color};">{q.get('theme', 'Question')}</div>
-                        <div class="q-text">❓ {q.get('question')}</div>
-                        <div class="q-answer">💡 Attendu : {q.get('attendu')}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+            with st.expander("🎤 Questions d'entretien"):
+                for q in d['entretien']:
+                    st.markdown(f"**{q.get('theme','Q')}**: {q.get('question')}")
+                    st.caption(f"Attendu: {q.get('attendu')}")
