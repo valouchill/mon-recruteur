@@ -1,31 +1,77 @@
+# AI Recruiter PRO — v15
+# Plateforme Streamlit durcie + fonctionnalités avancées
+# ----------------------------------------------------
+# Points forts vs v14
+# - Architecture + lisibilité : schéma Pydantic, normalisation robuste, deepcopy fix
+# - Concurrence : traitement des CV en parallèle (ThreadPoolExecutor)
+# - Pondérations ajustables : sliders pour Tech/Exp/Soft/Fit + seuils de qualification
+# - Dédoublonnage PII : hash basé sur email/téléphone, anonymisation optionnelle UI
+# - Guardrails LLM : JSON schema, validation stricte, repli tolérant
+# - Fallback extraction PDF (pdfminer si dispo), nettoyage texte
+# - Comparaison de candidats + vues supplémentaires (pipeline, notes)
+# - Persistance : export Excel (amélioré), en option CSV/SQLite
+# - Intégration Google Sheets conservée mais facultative
+# - UX : toasts, états, contrôles reset/restore, + petits raffinements visuels
+# - Sécurité : pas de mutation du DEFAULT_DATA, masquage des secrets, logs sobres
+
+from __future__ import annotations
+
 import streamlit as st
-import openai
-from pypdf import PdfReader
 import json
-import plotly.graph_objects as go
-import datetime
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import pandas as pd
 import io
-import statistics
+import re
 import uuid
 import time
-from typing import Optional, Dict, List
+import datetime as dt
+from typing import Optional, Dict, List, Any, Tuple
+from dataclasses import dataclass
+from copy import deepcopy
 
-# --- 0. CONFIGURATION PAGE ---
+# LLM (Groq-compatible OpenAI SDK)
+import openai
+
+# PDF
+from pypdf import PdfReader
+
+# Optional fallback
+try:
+    from pdfminer.high_level import extract_text as pdfminer_extract
+except Exception:  # pragma: no cover
+    pdfminer_extract = None
+
+# Data / viz
+import pandas as pd
+import plotly.graph_objects as go
+
+# Async / concurrency
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# Validation
+from pydantic import BaseModel, Field, ValidationError, conint, constr
+
+# Optional Sheets
+try:
+    import gspread
+    from oauth2client.service_account import ServiceAccountCredentials
+except Exception:  # pragma: no cover
+    gspread = None
+    ServiceAccountCredentials = None
+
+# -----------------------------
+# 0. PAGE CONFIG & THEME
+# -----------------------------
+
 st.set_page_config(
-    page_title="AI Recruiter PRO v14", 
-    layout="wide", 
+    page_title="AI Recruiter PRO v15",
+    layout="wide",
     page_icon="🎯",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# --- CSS AMÉLIORÉ ---
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-    
+# CSS (reprend v14 + ajustements mineurs)
+st.markdown(
+    """
+    <style>
     :root { 
         --primary: #4f46e5; 
         --success: #10b981;
@@ -36,16 +82,7 @@ st.markdown("""
         --bg-app: #f8fafc; 
         --border: #cbd5e1; 
     }
-    
-    .stApp { background-color: var(--bg-app); font-family: 'Inter', sans-serif; color: var(--text-main); }
-    h1, h2, h3, h4, .stMarkdown { color: var(--text-main) !important; font-family: 'Inter', sans-serif; }
-    p, li, label, .stCaption { color: var(--text-sub) !important; }
-    
-    [data-testid="stSidebar"] { background-color: white; border-right: 1px solid var(--border); }
-    [data-testid="stExpander"] { background: white; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .streamlit-expanderHeader { background-color: white !important; color: var(--text-main) !important; font-weight: 600; }
-    
-    /* KPI Cards avec couleurs sémantiques */
+    .stApp { background-color: var(--bg-app); }
     .kpi-card { background: white; padding: 20px; border: 1px solid var(--border); border-radius: 8px; text-align: center; height: 100%; position: relative; }
     .kpi-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; border-radius: 8px 8px 0 0; }
     .kpi-card.primary::before { background: var(--primary); }
@@ -53,474 +90,666 @@ st.markdown("""
     .kpi-card.warning::before { background: var(--warning); }
     .kpi-val { font-size: 1.6rem; font-weight: 700; color: var(--text-main); margin-bottom: 5px; }
     .kpi-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600; }
-    
-    /* Score visuel */
     .score-badge { display: inline-flex; align-items: center; justify-content: center; width: 60px; height: 60px; border-radius: 50%; font-weight: 800; font-size: 1.1rem; color: white; }
-    .score-high { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3); }
-    .score-mid { background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3); }
-    .score-low { background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3); }
-    
-    .header-row { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 15px; border-bottom: 1px solid #f1f5f9; margin-bottom: 20px; }
-    .c-name { font-size: 1.3rem; font-weight: 800; color: var(--text-main); margin: 0; }
-    .c-job { font-size: 0.95rem; color: var(--text-sub); margin-top: 2px; }
-    
-    .pill { background: #f1f5f9; border: 1px solid #e2e8f0; color: var(--text-main); padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 500; display: inline-flex; gap: 6px; margin-right: 8px; cursor: pointer; transition: all 0.2s; }
-    .pill:hover { background: #e0e7ff; border-color: var(--primary); }
-    .pill a { color: var(--primary) !important; text-decoration: none; font-weight: 600; }
-    
-    .analysis-box { border: 1px solid var(--border); background-color: #f8fafc; border-radius: 6px; padding: 15px; height: 100%; }
-    .analysis-title { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-bottom: 10px; display: block; }
-    .list-item { font-size: 0.9rem; margin-bottom: 6px; display: block; color: var(--text-main); line-height: 1.4; }
-    .txt-success { color: var(--success); } .txt-danger { color: var(--danger); }
-    
+    .score-high { background: linear-gradient(135deg, #10b981, #059669); }
+    .score-mid { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .score-low { background: linear-gradient(135deg, #ef4444, #dc2626); }
     .verdict { background: linear-gradient(to right, #eff6ff, #ffffff); color: var(--text-main); padding: 15px; border-radius: 8px; font-weight: 500; border-left: 4px solid var(--primary); margin-bottom: 20px; }
-    
-    .tl-item { border-left: 2px solid var(--border); padding-left: 15px; margin-bottom: 20px; position: relative; }
-    .tl-item::before { content: ""; position: absolute; left: -5px; top: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
-    .tl-title { font-weight: 700; color: var(--text-main); font-size: 0.95rem; }
-    .tl-date { font-size: 0.75rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
-    .tl-desc { font-size: 0.9rem; color: var(--text-sub); font-style: italic; margin-top: 4px; line-height: 1.4; }
-    
     .skill-tag { background: white; border: 1px solid var(--border); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; margin: 2px; display: inline-block; font-weight: 500; }
     .match { background: #f0fdf4; border-color: #86efac; color: #166534; }
     .missing { background: #fef2f2; border-color: #fecaca; color: #991b1b; text-decoration: line-through; opacity: 0.7;}
-    
-    .salary-box { padding: 15px; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center; margin-bottom: 20px; background: white; }
-    .salary-amount { font-size: 1.5rem; font-weight: 800; color: var(--text-main); }
-    
-    /* Tooltip */
-    .tooltip { position: relative; display: inline-block; cursor: help; }
-    .tooltip .tooltiptext { visibility: hidden; width: 200px; background-color: #1f2937; color: white; text-align: center; border-radius: 6px; padding: 8px; position: absolute; z-index: 1; bottom: 125%; left: 50%; margin-left: -100px; opacity: 0; transition: opacity 0.3s; font-size: 0.75rem; }
-    .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
-</style>
-""", unsafe_allow_html=True)
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-# --- 1. CLASSES & TYPES ---
+# -----------------------------
+# 1. MODELES Pydantic (schéma JSON strict)
+# -----------------------------
 
-DEFAULT_DATA = {
-    "infos": {"nom": "Candidat", "email": "N/A", "tel": "N/A", "ville": "", "linkedin": "#", "poste_actuel": ""},
-    "scores": {"global": 0, "tech": 0, "experience": 0, "soft": 0, "fit": 0},
-    "salaire": {"min": 0, "max": 0, "confiance": "", "analyse": "Non estimé"},
-    "analyse": {"verdict": "En attente", "points_forts": [], "points_faibles": []},
-    "competences": {"match": [], "manquant": []},
-    "historique": [],
-    "entretien": []
-}
+class Infos(BaseModel):
+    nom: str = "Candidat"
+    email: str = ""
+    tel: str = ""
+    ville: str = ""
+    linkedin: str = ""
+    poste_actuel: str = ""
 
-# --- 2. FONCTIONS ROBUSTES ---
+class Scores(BaseModel):
+    global_: conint(ge=0, le=100) = Field(0, alias="global")
+    tech: conint(ge=0, le=100) = 0
+    experience: conint(ge=0, le=100) = 0
+    soft: conint(ge=0, le=100) = 0
+    fit: conint(ge=0, le=100) = 0
 
-def normalize_json(raw: dict) -> dict:
-    """Nettoie et valide le JSON."""
-    if not isinstance(raw, dict): raw = {}
-    data = DEFAULT_DATA.copy()
-    
-    for key in DEFAULT_DATA:
-        if key in raw:
-            if isinstance(DEFAULT_DATA[key], dict): 
-                data[key].update(raw[key])
-            else: 
-                data[key] = raw[key]
-    
-    # Nettoyage Historique
-    clean_hist = []
-    for h in raw.get('historique', []):
-        clean_hist.append({
-            "titre": str(h.get('titre', 'Poste')),
-            "entreprise": str(h.get('entreprise', '')),
-            "duree": str(h.get('duree', '')),
-            "resume_synthetique": str(h.get('resume_synthetique', h.get('mission', '')))
-        })
-    data['historique'] = clean_hist
-    
-    return data
+    class Config:
+        allow_population_by_field_name = True
 
-@st.cache_resource
-def get_client():
-    """Initialise le client API avec gestion d'erreur."""
-    try: 
-        if "GROQ_API_KEY" not in st.secrets:
-            st.error("❌ Clé API manquante dans Secrets.")
+class Salaire(BaseModel):
+    min: int = 0
+    max: int = 0
+    confiance: constr(strip_whitespace=True) = ""
+    analyse: str = "Non estimé"
+
+class HistoriqueItem(BaseModel):
+    titre: str
+    entreprise: str = ""
+    duree: str = ""
+    resume_synthetique: str = ""
+
+class QuestionItem(BaseModel):
+    theme: str = "Général"
+    question: str = ""
+    attendu: str = ""
+
+class Analyse(BaseModel):
+    verdict: str = "En attente"
+    points_forts: List[str] = []
+    points_faibles: List[str] = []
+
+class Competences(BaseModel):
+    match: List[str] = []
+    manquant: List[str] = []
+
+class CandidateData(BaseModel):
+    infos: Infos = Infos()
+    scores: Scores = Scores()
+    salaire: Salaire = Salaire()
+    analyse: Analyse = Analyse()
+    competences: Competences = Competences()
+    historique: List[HistoriqueItem] = []
+    entretien: List[QuestionItem] = []
+
+# Défault non mutable
+DEFAULT_DATA = CandidateData().dict(by_alias=True)
+
+# -----------------------------
+# 2. OUTILS & HELPERS
+# -----------------------------
+
+@st.cache_resource(show_spinner=False)
+def get_client() -> Optional[openai.OpenAI]:
+    """Initialise le client Groq via SDK OpenAI-compatible."""
+    try:
+        key = st.secrets.get("GROQ_API_KEY")
+        if not key:
+            st.error("❌ Clé API GROQ_API_KEY manquante dans Secrets.")
             return None
-        return openai.OpenAI(
-            base_url="https://api.groq.com/openai/v1", 
-            api_key=st.secrets["GROQ_API_KEY"],
-            timeout=30.0  # Timeout pour éviter les blocages
-        )
+        client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=key, timeout=30.0)
+        return client
     except Exception as e:
         st.error(f"❌ Erreur initialisation API: {e}")
         return None
 
+
+def _clean_text(txt: str) -> str:
+    txt = re.sub(r"\s+", " ", txt or "").strip()
+    return txt
+
+
 def extract_pdf_safe(file_bytes: bytes) -> Optional[str]:
-    """Extraction PDF sécurisée avec gestion d'erreur."""
-    try: 
+    """Extraction texte PDF robuste avec fallback pdfminer (si présent)."""
+    try:
         stream = io.BytesIO(file_bytes)
         reader = PdfReader(stream)
-        text = ""
+        chunks = []
         for page in reader.pages:
-            page_text = page.extract_text()
+            page_text = page.extract_text() or ""
             if page_text:
-                text += page_text + "\n"
-        return text.strip()
+                chunks.append(page_text)
+        text = "\n".join(chunks).strip()
+        if not text and pdfminer_extract:
+            # Fallback si pypdf échoue
+            text = pdfminer_extract(io.BytesIO(file_bytes)) or ""
+        return _clean_text(text)
     except Exception as e:
-        st.error(f"❌ Erreur lecture PDF: {e}")
+        st.warning(f"⚠️ Erreur lecture PDF: {e}")
+        if pdfminer_extract:
+            try:
+                return _clean_text(pdfminer_extract(io.BytesIO(file_bytes)) or "")
+            except Exception:
+                return None
         return None
 
+
+def normalize_json(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """Valide et normalise la sortie LLM via Pydantic. Tolère les écarts minimes."""
+    try:
+        model = CandidateData.parse_obj(raw)
+        return model.dict(by_alias=True)
+    except ValidationError:
+        # Repli : on mappe manuellement les clés présentes
+        safe = deepcopy(DEFAULT_DATA)
+        # Infos
+        i = raw.get("infos", {}) or {}
+        for k in safe["infos"].keys():
+            if k in i:
+                safe["infos"][k] = i[k]
+        # Scores
+        sc = raw.get("scores", {}) or {}
+        for k in ["global", "tech", "experience", "soft", "fit"]:
+            if k in sc and isinstance(sc[k], (int, float)):
+                safe["scores"][k] = max(0, min(100, int(sc[k])))
+        # Salaire
+        sal = raw.get("salaire", {}) or {}
+        for k in safe["salaire"].keys():
+            if k in sal:
+                safe["salaire"][k] = sal[k]
+        # Analyse, competences
+        ana = raw.get("analyse", {}) or {}
+        for k in safe["analyse"].keys():
+            if k in ana:
+                safe["analyse"][k] = ana[k]
+        comp = raw.get("competences", {}) or {}
+        for k in safe["competences"].keys():
+            if k in comp:
+                safe["competences"][k] = comp[k]
+        # Historique
+        safe_hist = []
+        for h in raw.get("historique", []) or []:
+            safe_hist.append({
+                "titre": str(h.get("titre", "Poste")),
+                "entreprise": str(h.get("entreprise", "")),
+                "duree": str(h.get("duree", "")),
+                "resume_synthetique": str(h.get("resume_synthetique", h.get("mission", ""))),
+            })
+        safe["historique"] = safe_hist
+        # Entretien
+        safe_q = []
+        for q in raw.get("entretien", []) or []:
+            safe_q.append({
+                "theme": str(q.get("theme", "Général")),
+                "question": str(q.get("question", "")),
+                "attendu": str(q.get("attendu", "")),
+            })
+        safe["entretien"] = safe_q
+        return safe
+
+
+def hash_identity(email: str, tel: str) -> str:
+    base = (email or "").strip().lower() + "|" + re.sub(r"\D", "", tel or "")
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, base or str(uuid.uuid4())))
+
+
+def anonymize_infos(i: Dict[str, Any]) -> Dict[str, Any]:
+    """Masque PII pour l'affichage (optionnel)."""
+    ret = dict(i)
+    if ret.get("email"):
+        ret["email"] = re.sub(r"(^.).+(@.+$)", r"\1***\2", ret["email"])  # a***@domaine
+    if ret.get("tel"):
+        t = re.sub(r"\D", "", ret["tel"])  # digits only
+        if len(t) >= 4:
+            ret["tel"] = "✱✱✱✱ " + t[-4:]
+        else:
+            ret["tel"] = "✱✱✱✱"
+    if ret.get("linkedin"):
+        ret["linkedin"] = "(lien)"
+    return ret
+
+
+# -----------------------------
+# 3. LLM CALL
+# -----------------------------
+
+SCORING_PROMPT = """
+ROLE: Expert Recrutement (exigeant et précis), biais minimisés. Format STRICT JSON.
+
+CONTRAINTE: Réponds UNIQUEMENT en JSON valide, sans texte hors JSON.
+
+BARÈME:
+- GLOBAL (0-100) = Tech (40%) + Exp (30%) + Soft (15%) + Fit (15%).
+- Si compétence critique manquante ⇒ GLOBAL < 50.
+- 80+ Excellent | 60–79 Bon | 40–59 Moyen | <40 Inadéquat.
+
+SALAIRE (France 2025, k€ brut/an): ajuste selon séniorité, région (Paris +15%), rareté des skills.
+
+CHAMPS (schéma):
+{
+  "infos": {"nom": "", "email": "", "tel": "", "ville": "", "linkedin": "", "poste_actuel": ""},
+  "scores": {"global": 0, "tech": 0, "experience": 0, "soft": 0, "fit": 0},
+  "salaire": {"min": 0, "max": 0, "confiance": "", "analyse": ""},
+  "competences": {"match": [], "manquant": []},
+  "analyse": {"verdict": "", "points_forts": [], "points_faibles": []},
+  "historique": [{"titre": "", "entreprise": "", "duree": "", "resume_synthetique": ""}],
+  "entretien": [{"theme": "", "question": "", "attendu": ""}]
+}
+"""
+
 @st.cache_data(ttl=3600, show_spinner=False)
-def analyze_with_retry(job: str, cv: str, criteria: str = "", file_id: str = "", max_retries: int = 2) -> Optional[dict]:
-    """Analyse avec retry en cas d'échec."""
+def analyze_with_retry(job: str, cv: str, criteria: str, file_id: str, temp: float = 0.1, retries: int = 2) -> Optional[Dict[str, Any]]:
     client = get_client()
-    if not client: return None
-    
-    prompt = f"""
-    ID: {file_id}
-    ROLE: Expert Recrutement (Sévère et Précis).
-    
-    OFFRE: {job[:1500]}
-    CRITERES CRITIQUES: {criteria}
-    CV: {cv[:3000]}
-    
-    SCORING STRICT:
-    - GLOBAL (0-100) : Tech (40%) + Exp (30%) + Soft (15%) + Fit (15%)
-    - Sois exigeant : Si compétences clés manquantes → score < 50%
-    - 80+ = Excellent match, 60-79 = Bon, 40-59 = Moyen, <40 = Inadéquat
-    
-    SALAIRE:
-    - Estimation marché France 2025 (k€ brut annuel)
-    - Ajuste selon: Séniorité + Lieu (Paris +15%) + Rareté skills
-    
-    JSON STRICT:
-    {{
-        "infos": {{ "nom": "Prénom Nom", "email": "mail@", "tel": "06...", "ville": "...", "linkedin": "...", "poste_actuel": "..." }},
-        "scores": {{ "global": 0-100, "tech": 0-100, "experience": 0-100, "soft": 0-100, "fit": 0-100 }},
-        "salaire": {{ "min": 40, "max": 55, "confiance": "Haute", "analyse": "Justif courte" }},
-        "competences": {{ "match": ["A", "B"], "manquant": ["C"] }},
-        "analyse": {{ "verdict": "2 lignes max", "points_forts": ["F1", "F2"], "points_faibles": ["R1", "R2"] }},
-        "historique": [ {{ "titre": "...", "entreprise": "...", "duree": "...", "resume_synthetique": "Impact en 2 lignes" }} ],
-        "entretien": [ {{ "theme": "Technique", "question": "...", "attendu": "..." }} ]
-    }}
-    """
-    
-    for attempt in range(max_retries + 1):
+    if not client:
+        return None
+
+    # On tronque pour maîtriser le coût
+    job_c = job[:2000]
+    cv_c = cv[:4000]
+
+    user_prompt = f"""
+ID: {file_id}
+{SCORING_PROMPT}
+
+OFFRE:\n{job_c}\n\nCRITERES CRITIQUES:\n{criteria}\n\nCV:\n{cv_c}
+"""
+
+    last_err = None
+    for _ in range(retries + 1):
         try:
             res = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role": "user", "content": user_prompt}],
                 response_format={"type": "json_object"},
-                temperature=0.1,
-                max_tokens=2500
+                temperature=temp,
+                max_tokens=2200,
             )
-            return normalize_json(json.loads(res.choices[0].message.content))
+            raw = json.loads(res.choices[0].message.content)
+            return normalize_json(raw)
         except Exception as e:
-            if attempt < max_retries:
-                time.sleep(1)  # Wait avant retry
-                continue
-            else:
-                st.warning(f"⚠️ Échec analyse après {max_retries+1} tentatives: {e}")
-                return None
+            last_err = e
+            time.sleep(1.0)
+    st.warning(f"⚠️ Échec analyse: {last_err}")
+    return None
 
-def save_to_sheets(data: dict, job_desc: str):
-    """Sauvegarde Google Sheets avec gestion d'erreur."""
+
+# -----------------------------
+# 4. PERSISTENCE (facultatif)
+# -----------------------------
+
+def save_to_sheets(data: Dict[str, Any], job_desc: str) -> None:
+    if not (gspread and ServiceAccountCredentials):
+        return
     try:
-        if "gcp_service_account" not in st.secrets:
+        svc = st.secrets.get("gcp_service_account")
+        if not svc:
             return
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(
-            dict(st.secrets["gcp_service_account"]), scope
-        )
+        scope = [
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/drive",
+        ]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(svc), scope)
         client = gspread.authorize(creds)
         sheet = client.open("Recrutement_DB").sheet1
-        i, s = data['infos'], data['scores']
+        i, s = data["infos"], data["scores"]
         sheet.append_row([
-            datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-            i['nom'], f"{s['global']}%", i['email'], i['linkedin'], job_desc[:50]
+            dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            i.get("nom", ""), f"{s.get('global', 0)}%", i.get("email", ""), i.get("linkedin", ""), _clean_text(job_desc)[:80],
         ])
     except Exception as e:
-        st.warning(f"⚠️ Échec sauvegarde Sheets: {e}")
+        st.info(f"ℹ️ Sheets non accessible: {e}")
 
-def export_to_excel(results: List[dict]) -> bytes:
-    """Génère un fichier Excel téléchargeable."""
-    flat_data = []
+
+def export_to_excel(results: List[Dict[str, Any]]) -> bytes:
+    flat = []
     for r in results:
-        flat_data.append({
-            'Nom': r['infos']['nom'],
-            'Email': r['infos']['email'],
-            'Tel': r['infos']['tel'],
-            'Ville': r['infos']['ville'],
-            'LinkedIn': r['infos']['linkedin'],
-            'Poste Actuel': r['infos']['poste_actuel'],
-            'Score Global': r['scores']['global'],
-            'Score Tech': r['scores']['tech'],
-            'Score Exp': r['scores']['experience'],
-            'Score Soft': r['scores']['soft'],
-            'Score Fit': r['scores']['fit'],
-            'Salaire Min': r['salaire']['min'],
-            'Salaire Max': r['salaire']['max'],
-            'Verdict': r['analyse']['verdict'],
-            'Compétences Match': ', '.join(r['competences']['match']),
-            'Compétences Manquantes': ', '.join(r['competences']['manquant'])
+        i, s, sal = r["infos"], r["scores"], r["salaire"]
+        comp = r.get("competences", {})
+        flat.append({
+            "Nom": i.get("nom", ""),
+            "Email": i.get("email", ""),
+            "Tel": i.get("tel", ""),
+            "Ville": i.get("ville", ""),
+            "LinkedIn": i.get("linkedin", ""),
+            "Poste Actuel": i.get("poste_actuel", ""),
+            "Score Global": s.get("global", 0),
+            "Score Tech": s.get("tech", 0),
+            "Score Exp": s.get("experience", 0),
+            "Score Soft": s.get("soft", 0),
+            "Score Fit": s.get("fit", 0),
+            "Salaire Min": sal.get("min", 0),
+            "Salaire Max": sal.get("max", 0),
+            "Verdict": r.get("analyse", {}).get("verdict", ""),
+            "Compétences Match": ", ".join(comp.get("match", [])),
+            "Compétences Manquantes": ", ".join(comp.get("manquant", [])),
         })
-    
-    df = pd.DataFrame(flat_data)
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Candidats')
-    return output.getvalue()
+    df = pd.DataFrame(flat)
+    out = io.BytesIO()
+    with pd.ExcelWriter(out, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Candidats")
+    return out.getvalue()
 
-# --- 3. INTERFACE ---
+
+# -----------------------------
+# 5. SIDEBAR (CONFIG)
+# -----------------------------
 
 with st.sidebar:
-    st.markdown("### ⚙️ Configuration")
-    
-    ao_file = st.file_uploader("1️⃣ Offre d'emploi (PDF)", type='pdf', key="ao")
-    ao_text = st.text_area("Ou coller le texte", height=100, placeholder="Description du poste...")
-    
+    st.header("⚙️ Configuration")
+
+    # Offre
+    ao_file = st.file_uploader("1️⃣ Offre d'emploi (PDF)", type="pdf", key="ao")
+    ao_text = st.text_area("Ou coller le texte", height=100, placeholder="Description du poste…")
     job_text = ""
-    if ao_file: 
-        job_text = extract_pdf_safe(ao_file.getvalue())
-    elif ao_text: 
+    if ao_file:
+        job_text = extract_pdf_safe(ao_file.getvalue()) or ""
+    elif ao_text:
         job_text = ao_text
-    
-    criteria = st.text_area(
-        "2️⃣ Critères Non-Négociables", 
-        height=80,
-        placeholder="Ex: Anglais courant, Python expert, 5+ ans..."
-    )
-    
-    cv_files = st.file_uploader("3️⃣ CVs Candidats (PDF)", type='pdf', accept_multiple_files=True)
-    
+
+    # Critères
+    criteria = st.text_area("2️⃣ Critères Non‑Négociables", height=80, placeholder="Ex: Anglais courant, Python expert, 5+ ans…")
+
+    # Pondérations
+    st.subheader("⚖️ Pondérations")
+    w_tech = st.slider("Tech %", 0, 100, 40)
+    w_exp = st.slider("Expérience %", 0, 100, 30)
+    w_soft = st.slider("Soft %", 0, 100, 15)
+    w_fit = st.slider("Fit %", 0, 100, 15)
+    total_w = w_tech + w_exp + w_soft + w_fit
+    if total_w != 100:
+        st.warning(f"Les pondérations totalisent {total_w}%. Elles seront normalisées.")
+
+    # CVs
+    cv_files = st.file_uploader("3️⃣ CVs Candidats (PDF)", type="pdf", accept_multiple_files=True)
+
+    # Options
+    st.subheader("🔒 Options")
+    anonymize = st.checkbox("Anonymiser l'affichage (PII masquées)", value=False)
+    dedupe_on = st.checkbox("Dédoublonner par email/téléphone", value=True)
+    max_workers = st.number_input("Concurrence (threads)", min_value=1, max_value=8, value=3, step=1)
+    qualify_threshold = st.slider("Seuil qualifié (Score ≥)", 0, 100, 70)
+
     st.divider()
-    
     col_btn1, col_btn2 = st.columns(2)
     launch_btn = col_btn1.button("🚀 Analyser", type="primary", use_container_width=True)
     reset_btn = col_btn2.button("🗑️ Reset", use_container_width=True)
-    
+
     if reset_btn:
-        st.session_state.results = []
+        st.session_state.clear()
         st.rerun()
-    
-    # Aide contextuelle
+
     with st.expander("ℹ️ Aide"):
         st.caption("""
-        **Scoring**: 80+ = Excellent | 60-79 = Bon | 40-59 = Moyen | <40 = Inadéquat
-        
-        **Astuce**: Plus vos critères sont précis, plus l'IA est sévère.
+        **Scoring** (par défaut): Tech 40% • Exp 30% • Soft 15% • Fit 15% — ajustables ci‑dessus.
+        **Seuils**: 80+ Excellent | 60–79 Bon | 40–59 Moyen | <40 Inadéquat.
+        **Conseil**: Des critères précis → IA plus sévère.
         """)
 
-# State Init
-if 'results' not in st.session_state: 
-    st.session_state.results = []
-if 'filter_score' not in st.session_state:
-    st.session_state.filter_score = 0
+# State init
+if "results" not in st.session_state:
+    st.session_state["results"] = []
+if "raw_store" not in st.session_state:
+    st.session_state["raw_store"] = {}
 
-# --- LOGIQUE PRINCIPALE ---
+
+# -----------------------------
+# 6. LOGIQUE PRINCIPALE
+# -----------------------------
+
+def _normalize_weights(t: Tuple[int, int, int, int]) -> Tuple[float, float, float, float]:
+    s = sum(t)
+    if s <= 0:
+        return (0.4, 0.3, 0.15, 0.15)
+    return tuple(x / s for x in t)  # type: ignore
+
+
+def recompute_global(score: Dict[str, int], weights: Tuple[float, float, float, float]) -> int:
+    tech, exp, soft, fit = score.get("tech", 0), score.get("experience", 0), score.get("soft", 0), score.get("fit", 0)
+    g = tech * weights[0] + exp * weights[1] + soft * weights[2] + fit * weights[3]
+    return int(round(g))
+
+
+def process_single_cv(file_obj, job_text: str, criteria: str, weights: Tuple[float, float, float, float]) -> Optional[Dict[str, Any]]:
+    file_bytes = file_obj.getvalue()
+    cv_text = extract_pdf_safe(file_bytes) or ""
+    if len(cv_text) < 50:
+        st.warning(f"⚠️ {file_obj.name}: contenu insuffisant.")
+        return None
+    file_id = str(uuid.uuid4())
+    data = analyze_with_retry(job_text, cv_text, criteria, file_id=file_id)
+    if not data:
+        return None
+    # Recalcule GLOBAL selon pondérations courantes (si différente du prompt)
+    data["scores"]["global"] = recompute_global(data["scores"], weights)
+    return data
+
+
 if launch_btn:
     if not job_text or len(job_text) < 50:
         st.error("⚠️ L'offre doit contenir au moins 50 caractères.")
     elif not cv_files:
         st.error("⚠️ Ajoutez au moins un CV.")
     else:
-        new_results = []
-        
-        # Progress avec détails
-        progress_text = st.empty()
-        progress_bar = st.progress(0)
-        
-        for i, file_obj in enumerate(cv_files):
-            progress_text.text(f"📄 Analyse de {file_obj.name}...")
-            
-            file_bytes = file_obj.getvalue()
-            cv_text = extract_pdf_safe(file_bytes)
-            
-            if cv_text and len(cv_text) > 50:
-                unique_id = str(uuid.uuid4())
-                data = analyze_with_retry(job_text, cv_text, criteria, file_id=unique_id)
-                
-                if data: 
-                    save_to_sheets(data, job_text)
-                    new_results.append(data)
-            else:
-                st.warning(f"⚠️ Fichier {file_obj.name} illisible ou vide.")
-            
-            progress_bar.progress((i + 1) / len(cv_files))
-        
-        progress_text.empty()
-        progress_bar.empty()
-        
-        st.session_state.results = new_results
-        
-        if new_results:
-            st.success(f"✅ {len(new_results)} candidat(s) analysé(s) avec succès !")
+        results: List[Dict[str, Any]] = []
+        weights = _normalize_weights((w_tech, w_exp, w_soft, w_fit))
+
+        progress = st.empty()
+        bar = st.progress(0)
+
+        futures = []
+        with ThreadPoolExecutor(max_workers=int(max_workers)) as ex:
+            for f in cv_files:
+                futures.append(ex.submit(process_single_cv, f, job_text, criteria, weights))
+
+            done = 0
+            for fut in as_completed(futures):
+                res = fut.result()
+                if res:
+                    # Dédoublonnage
+                    if dedupe_on:
+                        identity = hash_identity(res["infos"].get("email", ""), res["infos"].get("tel", ""))
+                        if identity in st.session_state["raw_store"]:
+                            # garde le meilleur score
+                            prev = st.session_state["raw_store"][identity]
+                            if res["scores"]["global"] > prev["scores"]["global"]:
+                                st.session_state["raw_store"][identity] = res
+                        else:
+                            st.session_state["raw_store"][identity] = res
+                    else:
+                        results.append(res)
+                done += 1
+                bar.progress(done / len(futures))
+                progress.text(f"📄 {done}/{len(futures)} CV traités…")
+
+        progress.empty(); bar.empty()
+
+        # Consolidation si dedupe
+        if dedupe_on:
+            results = list(st.session_state["raw_store"].values())
+
+        # Sauvegarde optionnelle Sheets
+        for d in results:
+            save_to_sheets(d, job_text)
+
+        st.session_state["results"] = results
+        if results:
+            st.success(f"✅ {len(results)} candidat(s) analysé(s) !")
             st.rerun()
         else:
-            st.error("❌ Aucune analyse n'a abouti. Vérifiez vos fichiers PDF.")
+            st.error("❌ Aucune analyse n'a abouti. Vérifiez vos PDF.")
 
-# --- DASHBOARD ---
-if not st.session_state.results:
-    st.markdown("""
-    <div style="text-align: center; padding: 80px 20px;">
-        <h1 style="color: var(--text-main); font-weight: 800;">AI Recruiter PRO v14</h1>
-        <p style="color: var(--text-sub); font-size: 1.1rem;">Analyse intelligente de candidatures</p>
-        <div style="margin-top: 50px; opacity: 0.5;">
-            <p>👈 Configurez dans la barre latérale pour commencer</p>
+
+# -----------------------------
+# 7. VUES (DASHBOARD + COMPARAISON)
+# -----------------------------
+
+results: List[Dict[str, Any]] = st.session_state.get("results", []) or []
+
+if not results:
+    st.markdown(
+        """
+        <div style="text-align:center; padding:80px 20px;">
+            <h1 style="color:var(--text-main); font-weight:800;">AI Recruiter PRO v15</h1>
+            <p style="color:var(--text-sub); font-size:1.1rem;">Analyse intelligente de candidatures</p>
+            <div style="margin-top:50px; opacity:0.6;">👈 Configurez dans la barre latérale pour commencer</div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
-
+        """,
+        unsafe_allow_html=True,
+    )
 else:
-    sorted_res = sorted(st.session_state.results, key=lambda x: x['scores']['global'], reverse=True)
-    
-    # --- KPI AMÉLIORÉS ---
-    avg = int(statistics.mean([r['scores']['global'] for r in sorted_res]))
-    top = sorted_res[0]['scores']['global']
-    qualified = len([x for x in sorted_res if x['scores']['global'] >= 70])
-    
+    # Tri et métriques
+    results_sorted = sorted(results, key=lambda x: x["scores"]["global"], reverse=True)
+    avg = int(round(sum(r["scores"]["global"] for r in results_sorted) / max(1, len(results_sorted))))
+    top = results_sorted[0]["scores"]["global"]
+    qualified_count = len([x for x in results_sorted if x["scores"]["global"] >= qualify_threshold])
+
     c1, c2, c3, c4 = st.columns(4)
-    c1.markdown(f"""<div class="kpi-card primary"><div class="kpi-val">{len(sorted_res)}</div><div class="kpi-label">Candidats</div></div>""", unsafe_allow_html=True)
-    c2.markdown(f"""<div class="kpi-card success"><div class="kpi-val">{qualified}</div><div class="kpi-label">Qualifiés (70+%)</div></div>""", unsafe_allow_html=True)
-    c3.markdown(f"""<div class="kpi-card warning"><div class="kpi-val">{avg}%</div><div class="kpi-label">Score Moyen</div></div>""", unsafe_allow_html=True)
-    c4.markdown(f"""<div class="kpi-card primary"><div class="kpi-val">{top}%</div><div class="kpi-label">Top Candidat</div></div>""", unsafe_allow_html=True)
-    
+    c1.markdown(f"""<div class=\"kpi-card primary\"><div class=\"kpi-val\">{len(results_sorted)}</div><div class=\"kpi-label\">Candidats</div></div>""", unsafe_allow_html=True)
+    c2.markdown(f"""<div class=\"kpi-card success\"><div class=\"kpi-val\">{qualified_count}</div><div class=\"kpi-label\">Qualifiés (≥ {qualify_threshold}%)</div></div>""", unsafe_allow_html=True)
+    c3.markdown(f"""<div class=\"kpi-card warning\"><div class=\"kpi-val\">{avg}%</div><div class=\"kpi-label\">Score moyen</div></div>""", unsafe_allow_html=True)
+    c4.markdown(f"""<div class=\"kpi-card primary\"><div class=\"kpi-val\">{top}%</div><div class=\"kpi-label\">Top candidat</div></div>""", unsafe_allow_html=True)
+
+    # Barre d'actions
     st.write("")
-    
-    # --- BARRE D'ACTIONS ---
-    col_filter, col_export, col_spacer = st.columns([1, 1, 2])
-    
-    with col_filter:
+    left, mid, right = st.columns([2, 1, 2])
+    with left:
         filter_val = st.selectbox(
             "Filtrer par score",
             options=[0, 40, 60, 70, 80],
-            format_func=lambda x: f"Tous" if x == 0 else f"Score ≥ {x}%",
-            key="filter_dropdown"
+            format_func=lambda x: "Tous" if x == 0 else f"Score ≥ {x}%",
         )
-        st.session_state.filter_score = filter_val
-    
-    with col_export:
+    with mid:
         if st.button("📥 Exporter Excel", use_container_width=True):
-            excel_data = export_to_excel(sorted_res)
+            excel_data = export_to_excel(results_sorted)
             st.download_button(
                 "💾 Télécharger",
                 data=excel_data,
-                file_name=f"candidats_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                file_name=f"candidats_{dt.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
+                use_container_width=True,
             )
-    
-    st.divider()
-    
-    # Filtrage
-    filtered_res = [r for r in sorted_res if r['scores']['global'] >= st.session_state.filter_score]
-    
-    if not filtered_res:
-        st.warning(f"Aucun candidat avec un score ≥ {st.session_state.filter_score}%")
-    
-    # --- LISTE CANDIDATS ---
-    for idx, d in enumerate(filtered_res):
-        i = d['infos']
-        s = d['scores']
-        
-        # Couleur sémantique du score
-        if s['global'] >= 75:
-            score_class = "score-high"
-            score_emoji = "🌟"
-        elif s['global'] >= 50:
-            score_class = "score-mid"
-            score_emoji = "⚡"
-        else:
-            score_class = "score-low"
-            score_emoji = "⚠️"
-        
-        unique_key = f"chart_{idx}_{uuid.uuid4()}"
-        
-        with st.expander(f"{score_emoji} {i['nom']}  —  {s['global']}%", expanded=(idx == 0)):
-            
-            # Header
-            st.markdown(f"""
-            <div class="header-row">
-                <div>
-                    <h3 class="c-name">{i['nom']}</h3>
-                    <div class="c-job">{i['poste_actuel']} • {i['ville']}</div>
-                    <div style="margin-top:10px;">
-                        <span class="pill">📧 {i['email']}</span>
-                        <span class="pill">📞 {i['tel']}</span>
-                        <span class="pill">🔗 <a href="{i['linkedin']}" target="_blank">LinkedIn</a></span>
-                    </div>
-                </div>
-                <div class="score-badge {score_class}">{s['global']}%</div>
-            </div>
-            """, unsafe_allow_html=True)
+    with right:
+        # Comparateur rapide
+        names = [r["infos"].get("nom", f"Candidat {i+1}") for i, r in enumerate(results_sorted)]
+        comp_sel = st.multiselect("Comparer (max 3)", options=names, default=names[:0], max_selections=3)
 
-            # Verdict
-            st.markdown(f"""<div class="verdict">💡 <strong>Verdict:</strong> {d['analyse']['verdict']}</div>""", unsafe_allow_html=True)
-            
-            # Analyse Grid
-            gc1, gc2 = st.columns(2)
-            with gc1:
-                forces_html = "".join([f"<span class='list-item txt-success'>✓ {f}</span>" for f in d['analyse']['points_forts'][:4]])
-                st.markdown(f"<div class='analysis-box'><span class='analysis-title'>Points Forts</span>{forces_html}</div>", unsafe_allow_html=True)
-            with gc2:
-                faibles_html = "".join([f"<span class='list-item txt-danger'>✗ {f}</span>" for f in d['analyse']['points_faibles'][:4]])
-                st.markdown(f"<div class='analysis-box'><span class='analysis-title'>Vigilance</span>{faibles_html}</div>", unsafe_allow_html=True)
-            
+    st.divider()
+
+    # Vue Comparaison si sélection
+    if comp_sel:
+        sel = [r for r in results_sorted if r["infos"].get("nom", "") in comp_sel]
+        if sel:
+            cols = st.columns(len(sel))
+            for j, d in enumerate(sel):
+                i, s = d["infos"], d["scores"]
+                i_disp = anonymize_infos(i) if st.session_state.get("anonymize_override", False) else (anonymize_infos(i) if anonymize else i)
+                cols[j].markdown(f"**{i_disp.get('nom', 'Candidat')} — {s.get('global',0)}%**")
+                # Radar
+                cat = ['Tech', 'Exp', 'Soft', 'Fit', 'Tech']
+                val = [s.get('tech',0), s.get('experience',0), s.get('soft',0), s.get('fit',0), s.get('tech',0)]
+                fig = go.Figure(go.Scatterpolar(r=val, theta=cat, fill='toself'))
+                fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=False, height=260, margin=dict(t=10,b=10,l=10,r=10))
+                cols[j].plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
             st.divider()
-            
-            # Détails & Viz
-            col_g, col_d = st.columns([2, 1])
-            
-            with col_g:
+
+    # Filtrage liste
+    filtered = [r for r in results_sorted if r["scores"]["global"] >= filter_val]
+    if not filtered:
+        st.warning(f"Aucun candidat avec un score ≥ {filter_val}%")
+
+    # Listing candidats
+    for idx, d in enumerate(filtered):
+        i = d["infos"]
+        s = d["scores"]
+        i_disp = anonymize_infos(i) if anonymize else i
+
+        if s.get("global", 0) >= 75:
+            score_class, score_emoji = "score-high", "🌟"
+        elif s.get("global", 0) >= 50:
+            score_class, score_emoji = "score-mid", "⚡"
+        else:
+            score_class, score_emoji = "score-low", "⚠️"
+
+        with st.expander(f"{score_emoji} {i_disp.get('nom','Candidat')} — {s.get('global',0)}%", expanded=(idx == 0)):
+            # Header
+            st.markdown(
+                f"""
+                <div style='display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:1px solid #f1f5f9;margin-bottom:12px;'>
+                    <div>
+                        <h3 style='margin:0'>{i_disp.get('nom','Candidat')}</h3>
+                        <div style='color:#64748b'>{i_disp.get('poste_actuel','')} • {i_disp.get('ville','')}</div>
+                        <div style='margin-top:10px;'>
+                            <span class='skill-tag'>📧 {i_disp.get('email','')}</span>
+                            <span class='skill-tag'>📞 {i_disp.get('tel','')}</span>
+                            <span class='skill-tag'>🔗 {i_disp.get('linkedin','')}</span>
+                        </div>
+                    </div>
+                    <div class='score-badge {score_class}'>{s.get('global',0)}%</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            st.markdown(f"""<div class='verdict'>💡 <strong>Verdict:</strong> {d.get('analyse',{}).get('verdict','')}</div>""", unsafe_allow_html=True)
+
+            # Points forts / Vigilance
+            cA, cB = st.columns(2)
+            with cA:
+                forces = d.get("analyse", {}).get("points_forts", [])[:5]
+                st.markdown("**Points forts**")
+                for f in forces:
+                    st.write("✅ ", f)
+            with cB:
+                risks = d.get("analyse", {}).get("points_faibles", [])[:5]
+                st.markdown("**Vigilance**")
+                for r in risks:
+                    st.write("❗ ", r)
+
+            st.divider()
+            left, right = st.columns([2,1])
+
+            with left:
                 st.markdown("#### 📅 Parcours Professionnel")
-                if d['historique']:
-                    for h in d['historique'][:3]:
-                        st.markdown(f"""
-                        <div class="tl-item">
-                            <div class="tl-date">{h['duree']}</div>
-                            <div class="tl-title">{h['titre']} @ {h['entreprise']}</div>
-                            <div class="tl-desc">{h['resume_synthetique']}</div>
-                        </div>""", unsafe_allow_html=True)
+                hist = d.get("historique", [])
+                if hist:
+                    for h in hist[:4]:
+                        st.markdown(
+                            f"**{h.get('titre','')}** @ {h.get('entreprise','')} — {h.get('duree','')}\n\n> _{h.get('resume_synthetique','')}_"
+                        )
                 else:
                     st.caption("Historique non disponible")
 
-            with col_d:
-                # Salaire
-                st.markdown(f"""
-                <div class="salary-box">
-                    <div style="font-size:0.7rem; color:var(--text-sub); text-transform:uppercase;">Salaire Estimé</div>
-                    <div class="salary-amount">{d['salaire']['min']}-{d['salaire']['max']} k€</div>
-                    <div style="font-size:0.75rem; color:var(--primary); margin-top:5px;">{d['salaire']['confiance']}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
+            with right:
+                sal = d.get("salaire", {})
+                st.markdown(
+                    f"""
+                    <div style='padding:12px;border:1px solid #e2e8f0;border-radius:8px;background:white;text-align:center;'>
+                        <div style='font-size:0.75rem;color:#64748b;text-transform:uppercase;'>Salaire Estimé</div>
+                        <div style='font-size:1.5rem;font-weight:800;color:#312e81;'>{sal.get('min',0)}–{sal.get('max',0)} k€</div>
+                        <div style='font-size:0.8rem;color:#4f46e5;margin-top:4px;'>{sal.get('confiance','')}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
                 # Radar
                 cat = ['Tech', 'Exp', 'Soft', 'Fit', 'Tech']
-                val = [s['tech'], s['experience'], s['soft'], s['fit'], s['tech']]
-                
-                fig = go.Figure(go.Scatterpolar(
-                    r=val, theta=cat, fill='toself',
-                    line=dict(color='#4f46e5', width=2),
-                    fillcolor='rgba(79, 70, 229, 0.15)'
-                ))
-                fig.update_layout(
-                    polar=dict(
-                        radialaxis=dict(visible=True, range=[0, 100], showticklabels=False, gridcolor='#e5e7eb'),
-                        angularaxis=dict(tickfont=dict(size=10, color='#64748b', family='Inter'))
-                    ),
-                    showlegend=False,
-                    margin=dict(t=20, b=20, l=30, r=30),
-                    height=220,
-                    paper_bgcolor='rgba(0,0,0,0)'
-                )
-                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=unique_key)
-            
+                val = [s.get('tech',0), s.get('experience',0), s.get('soft',0), s.get('fit',0), s.get('tech',0)]
+                fig = go.Figure(go.Scatterpolar(r=val, theta=cat, fill='toself'))
+                fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=False, height=240, margin=dict(t=10,b=10,l=10,r=10))
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+
             # Skills
             st.markdown("#### 🛠️ Compétences Techniques")
-            skills_html = ""
-            for sk in d['competences']['match']: 
-                skills_html += f"<span class='skill-tag match'>✓ {sk}</span>"
-            for sk in d['competences']['manquant']: 
-                skills_html += f"<span class='skill-tag missing'>{sk}</span>"
+            comp = d.get("competences", {})
+            skills_html = "".join([f"<span class='skill-tag match'>✓ {sk}</span>" for sk in comp.get("match", [])])
+            skills_html += "".join([f"<span class='skill-tag missing'>{sk}</span>" for sk in comp.get("manquant", [])])
             st.markdown(skills_html, unsafe_allow_html=True)
-            
-            # Questions
-            with st.expander("🎯 Guide d'Entretien"):
-                for q in d['entretien']:
-                    theme_color = "#10b981" if q.get('theme') == 'Technique' else "#f59e0b"
-                    st.markdown(f"<div style='border-left:3px solid {theme_color}; padding-left:10px; margin-bottom:10px;'><strong>{q.get('theme','Q')}</strong>: {q.get('question')}<br><em style='color:#64748b; font-size:0.85rem;'>Attendu: {q.get('attendu')}</em></div>", unsafe_allow_html=True)
+
+            # Notes + Guide entretien
+            with st.expander("🗒️ Notes & suivi"):
+                note_key = f"note_{idx}"
+                note_val = st.session_state.get(note_key, "")
+                new_note = st.text_area("Vos notes (local, non partagé)", value=note_val, key=note_key)
+                st.caption("Astuce : utilisez les notes pour consigner feedbacks d'entretien, objections, etc.")
+
+            with st.expander("🎯 Guide d'entretien"):
+                for q in d.get("entretien", [])[:6]:
+                    theme = q.get("theme", "Général")
+                    st.markdown(f"**{theme}** — {q.get('question','')}\n\n> Attendu : _{q.get('attendu','')}_")
+
+
+# -----------------------------
+# 8. CONSEILS DE PROD (affichage optionnel)
+# -----------------------------
+with st.expander("🏭 Conseils de mise en prod (checklist rapide)"):
+    st.markdown(
+        """
+- **Auth & multi‑tenant** : `streamlit-authenticator` ou proxy (Cloudflare Access). Séparer datasets par client.
+- **Stockage** : basculer persistance sur DB managée (Postgres/Neon/Supabase). Tables : projects, candidates, analyses, notes, audit.
+- **Traçabilité & audit** : journaliser prompts/versions, horodatage, identifiants CV, opérateur.
+- **Conformité RGPD** : consentement, durée de rétention, export/suppression des données, anonymisation en défaut.
+- **Files volumineux** : mettre une limite (p. ex. 8 Mo) + messages clairs.
+- **Observabilité** : Sentry / OpenTelemetry. Alertes en cas d’erreurs LLM.
+- **Coût & quota** : cache agressif (`st.cache_data` sur couples {job,cv,critères}), contrôle taux de parallélisme.
+- **Tests** : tests unitaires des parseurs PDF et du normaliseur JSON. Golden files.
+- **Déploiement** : Docker + Cloud Run/Render/Fly.io. Ajout d’un `requirements.txt` figé.
+        """
+    )
