@@ -19,70 +19,44 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS (DESIGN SYSTEM HARMONISÉ) ---
+# --- CSS (DESIGN SYSTEM) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    
     :root { --primary: #4f46e5; --text-main: #312e81; --text-sub: #64748b; --bg-app: #f8fafc; --border: #cbd5e1; }
-    
     .stApp { background-color: var(--bg-app); font-family: 'Inter', sans-serif; color: var(--text-main); }
     h1, h2, h3, h4, .stMarkdown { color: var(--text-main) !important; font-family: 'Inter', sans-serif; }
     p, li, label, .stCaption { color: var(--text-sub) !important; }
-    
     [data-testid="stSidebar"] { background-color: white; border-right: 1px solid var(--border); }
-    [data-testid="stSidebar"] * { color: var(--text-main); }
-    [data-testid="stSidebar"] label, [data-testid="stSidebar"] p { color: var(--text-sub) !important; }
-    
-    .stTextArea textarea, .stTextInput input { color: var(--text-main) !important; background-color: #f8fafc !important; border: 1px solid var(--border) !important; }
-    
-    div[data-testid="stExpander"] { background: white; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    [data-testid="stExpander"] { background: white; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .streamlit-expanderHeader { background-color: white !important; color: var(--text-main) !important; font-weight: 600; }
-    
     .kpi-card { background: white; padding: 20px; border: 1px solid var(--border); border-radius: 8px; text-align: center; height: 100%; }
     .kpi-val { font-size: 1.6rem; font-weight: 700; color: var(--primary); margin-bottom: 5px; }
-    .kpi-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
-    
+    .kpi-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600; }
     .header-row { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 15px; border-bottom: 1px solid #f1f5f9; margin-bottom: 20px; }
     .c-name { font-size: 1.3rem; font-weight: 700; color: var(--text-main); margin: 0; }
-    .c-job { font-size: 0.95rem; color: var(--text-sub); margin-top: 2px; }
     .score-box { background: var(--primary); color: white; padding: 8px 16px; border-radius: 6px; font-weight: 700; font-size: 1rem; }
-    
-    .pill { background: #f1f5f9; border: 1px solid #e2e8f0; color: var(--text-main); padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; margin-top: 8px; }
-    .pill a { color: var(--primary) !important; text-decoration: none; font-weight: 600; }
-    
+    .pill { background: #f1f5f9; border: 1px solid #e2e8f0; color: var(--text-main); padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 500; display: inline-flex; gap: 6px; margin-right: 8px; }
     .analysis-container { border: 1px solid var(--border); background-color: #f8fafc; border-radius: 6px; padding: 15px; height: 100%; }
-    .analysis-title { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-bottom: 10px; display: block; }
     .list-item { font-size: 0.9rem; margin-bottom: 6px; display: block; color: var(--text-main); }
-    .txt-success { color: #15803d; }
-    .txt-danger { color: #b91c1c; }
-    
-    .verdict { background: #e0e7ff; color: var(--text-main); padding: 15px; border-radius: 6px; font-weight: 500; font-size: 0.95rem; line-height: 1.5; border-left: 4px solid var(--primary); margin-bottom: 20px; }
-    
-    .tl-item { border-left: 2px solid var(--border); padding-left: 15px; margin-bottom: 20px; padding-bottom: 5px; }
+    .txt-success { color: #15803d; } .txt-danger { color: #b91c1c; }
+    .verdict { background: #e0e7ff; color: var(--text-main); padding: 15px; border-radius: 6px; font-weight: 500; border-left: 4px solid var(--primary); margin-bottom: 20px; }
+    .tl-item { border-left: 2px solid var(--border); padding-left: 15px; margin-bottom: 20px; }
     .tl-title { font-weight: 700; color: var(--text-main); font-size: 0.95rem; }
-    .tl-date { font-size: 0.75rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600; margin-bottom: 5px; display: block;}
-    .tl-desc { font-size: 0.9rem; color: var(--text-sub); font-style: italic; }
-    
-    .skill-tag { background: white; border: 1px solid var(--border); color: var(--text-main); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 500; display: inline-block; margin: 2px; }
-    .skill-tag.match { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
-    .skill-tag.missing { background: #fef2f2; border-color: #fecaca; color: #991b1b; text-decoration: line-through; opacity: 0.7;}
-    
+    .tl-date { font-size: 0.75rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600; }
+    .tl-desc { font-size: 0.9rem; color: var(--text-sub); font-style: italic; margin-top: 4px; }
+    .skill-tag { background: white; border: 1px solid var(--border); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; margin: 2px; display: inline-block; }
+    .match { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+    .missing { background: #fef2f2; border-color: #fecaca; color: #991b1b; text-decoration: line-through; opacity: 0.7;}
     .salary-amount { font-size: 1.5rem; font-weight: 700; color: var(--text-main); }
-    
     .question-box { background-color: #f1f5f9; border-left: 3px solid var(--primary); padding: 12px; margin-bottom: 10px; border-radius: 0 6px 6px 0; }
     .q-theme { text-transform: uppercase; font-size: 0.7rem; color: var(--primary); font-weight: 700; margin-bottom: 4px; }
     .q-text { font-weight: 600; color: var(--text-main); font-size: 0.9rem; margin-bottom: 6px; }
     .q-answer { font-size: 0.85rem; color: var(--text-sub); font-style: italic; }
-    
-    [data-testid="stFileUploader"] section { background-color: #f8fafc !important; border: 1px dashed var(--border) !important; }
-    [data-testid="stFileUploader"] section > div, [data-testid="stFileUploader"] section span, [data-testid="stFileUploader"] section small { color: var(--text-sub) !important; }
-    [data-testid="stFileUploader"] svg { fill: var(--text-sub) !important; }
-    [data-testid="stFileUploader"] button { color: var(--primary) !important; border-color: var(--primary) !important; background-color: white !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 1. FONCTIONS UTILITAIRES ---
+# --- 1. LOGIQUE MÉTIER ---
 
 DEFAULT_DATA = {
     "infos": {"nom": "Candidat", "email": "N/A", "tel": "N/A", "ville": "", "linkedin": "#", "poste_actuel": ""},
@@ -95,7 +69,6 @@ DEFAULT_DATA = {
 }
 
 def normalize_json(raw):
-    """Nettoie et normalise le JSON pour éviter les erreurs d'affichage."""
     if not isinstance(raw, dict): raw = {}
     data = DEFAULT_DATA.copy()
     for key in DEFAULT_DATA:
@@ -103,7 +76,6 @@ def normalize_json(raw):
             if isinstance(DEFAULT_DATA[key], dict): data[key].update(raw[key])
             else: data[key] = raw[key]
     
-    # Nettoyage spécifique Historique
     clean_hist = []
     for h in raw.get('historique', []):
         clean_hist.append({
@@ -120,58 +92,58 @@ def get_client():
     try: return openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=st.secrets["GROQ_API_KEY"])
     except: return None
 
-def extract_pdf(uploaded_file):
+# --- CORRECTION CRITIQUE LECTURE PDF ---
+def extract_pdf_from_bytes(file_bytes):
     """
-    Extrait le texte d'un PDF de manière robuste.
-    Utilise io.BytesIO pour créer un flux indépendant pour chaque fichier.
+    Crée un flux BytesIO frais pour chaque fichier.
+    C'est ici que la duplication est évitée.
     """
-    try:
-        # CRITIQUE : On lit les bytes directement pour éviter les conflits de pointeurs fichiers
-        if isinstance(uploaded_file, bytes):
-            bytes_stream = io.BytesIO(uploaded_file)
-        else:
-            uploaded_file.seek(0)
-            bytes_stream = io.BytesIO(uploaded_file.read())
-            
-        reader = PdfReader(bytes_stream)
+    try: 
+        # On crée un NOUVEL objet BytesIO à chaque appel avec les données brutes
+        stream = io.BytesIO(file_bytes)
+        reader = PdfReader(stream)
         text = ""
         for page in reader.pages:
             text += page.extract_text() or ""
         return text
-    except Exception as e:
+    except Exception as e: 
         print(f"Erreur lecture PDF: {e}")
         return ""
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def analyze_candidate(job, cv, criteria="", file_id=""):
-    """
-    Analyse un candidat via l'API.
-    Mise en cache activée pour performance, basée sur le contenu (job, cv, criteria).
-    """
     client = get_client()
     if not client: return None
     
+    # --- RETOUR DU PROMPT "EXPERT" (SCORING FIABLE) ---
     prompt = f"""
     ID_ANALYSIS: {file_id}
-    ROLE: Expert Recrutement & Chasseur de Têtes.
+    ROLE: Expert Recrutement.
     OFFRE: {job[:1500]}
     CRITERES: {criteria}
-    CV: {cv[:3000]}
+    CV: {cv[:3500]}
     
-    TACHE: Analyse critique et Scoring.
+    TACHE: Analyse critique.
     
-    SCORING (STRICT):
-    - Note globale basée sur: Tech (40%), Expérience (40%), Soft (10%), Fit (10%).
+    1. SCORING (Pondéré et Sévère) :
+       - GLOBAL (0-100) : Moyenne pondérée de Tech (40%), Expérience (30%), Soft (15%), Fit (15%).
+       - Ne donne pas 80% par défaut. Si le candidat n'a pas les mots-clés exacts de l'offre, note < 50%.
     
-    OUTPUT JSON STRICT:
+    2. SALAIRE :
+       - Estime la fourchette (k€ brut annuel) selon l'expérience (Junior/Senior) et le lieu (Paris vs Province).
+    
+    3. HISTORIQUE :
+       - Résume les 2 dernières expériences en 2 lignes max ("resume_synthetique").
+    
+    JSON STRICT:
     {{
         "infos": {{ "nom": "Prénom Nom", "email": "...", "tel": "...", "ville": "...", "linkedin": "...", "poste_actuel": "..." }},
         "scores": {{ "global": 0-100, "tech": 0-100, "experience": 0-100, "soft": 0-100, "fit": 0-100 }},
         "salaire": {{ "min": int, "max": int, "confiance": "Haute/Basse", "analyse": "..." }},
-        "competences": {{ "match": ["Skill A", "Skill B"], "manquant": ["Skill C"] }},
-        "analyse": {{ "verdict": "Synthèse objective (2 lignes).", "points_forts": ["A"], "points_faibles": ["B"] }},
-        "historique": [ {{ "titre": "...", "entreprise": "...", "duree": "...", "resume_synthetique": "2 lignes max." }} ],
-        "entretien": [ {{ "theme": "Technique", "question": "...", "attendu": "..." }} ]
+        "competences": {{ "match": ["Skill A"], "manquant": ["Skill B"] }},
+        "analyse": {{ "verdict": "Synthèse (2 lignes).", "points_forts": ["A"], "points_faibles": ["B"] }},
+        "historique": [ {{ "titre": "...", "entreprise": "...", "duree": "...", "resume_synthetique": "..." }} ],
+        "entretien": [ {{ "theme": "...", "question": "...", "attendu": "..." }} ]
     }}
     """
     try:
@@ -182,7 +154,7 @@ def analyze_candidate(job, cv, criteria="", file_id=""):
             temperature=0.1
         )
         return normalize_json(json.loads(res.choices[0].message.content))
-    except Exception as e:
+    except Exception:
         return None
 
 def save_to_sheets(data, job_desc):
@@ -204,8 +176,11 @@ with st.sidebar:
     ao_text_input = st.text_area("Ou texte offre", height=100)
     
     job_text = ""
-    if ao_file: job_text = extract_pdf(ao_file)
-    elif ao_text_input: job_text = ao_text_input
+    if ao_file: 
+        # Lecture immédiate des bytes pour l'AO aussi
+        job_text = extract_pdf_from_bytes(ao_file.getvalue())
+    elif ao_text_input: 
+        job_text = ao_text_input
         
     criteria = st.text_area("2. Critères spécifiques", height=80)
     cv_files = st.file_uploader("3. CVs Candidats", type='pdf', accept_multiple_files=True)
@@ -218,24 +193,27 @@ with st.sidebar:
 
 if 'results' not in st.session_state: st.session_state.results = []
 
-# --- LOGIQUE PRINCIPALE ---
+# --- LOGIQUE PRINCIPALE (CORRIGÉE MULTI-FICHIERS) ---
 if launch_btn:
     if not job_text:
         st.error("⚠️ Veuillez ajouter une Offre.")
     elif not cv_files:
         st.error("⚠️ Veuillez ajouter des CVs.")
     else:
-        # On utilise une liste temporaire pour collecter les résultats
         new_results = []
         progress_bar = st.progress(0)
         
         for i, file_obj in enumerate(cv_files):
-            # CRUCIAL : Extraction propre via BytesIO
-            cv_text = extract_pdf(file_obj)
+            # --- CORRECTION MAJEURE ICI ---
+            # On lit les bytes bruts du fichier Uploader
+            # Cela crée une copie en mémoire indépendante pour chaque tour de boucle
+            file_bytes = file_obj.getvalue()
+            
+            # Extraction du texte depuis ces bytes frais
+            cv_text = extract_pdf_from_bytes(file_bytes)
             
             if cv_text and len(cv_text) > 50:
-                # L'ID unique force le cache à différencier les appels si besoin, 
-                # mais ici le contenu cv_text est la vraie clé.
+                # L'ID unique permet d'éviter les conflits de cache
                 unique_id = str(uuid.uuid4())
                 
                 data = analyze_candidate(job_text, cv_text, criteria, file_id=unique_id)
@@ -246,11 +224,10 @@ if launch_btn:
             progress_bar.progress((i + 1) / len(cv_files))
             
         progress_bar.empty()
-        # Mise à jour du state et rechargement pour affichage
         st.session_state.results = new_results
         st.rerun()
 
-# --- AFFICHAGE DASHBOARD ---
+# --- DASHBOARD CONTENT ---
 if not st.session_state.results:
     st.markdown("""
     <div style="text-align: center; padding: 60px 20px; color: var(--text-sub);">
@@ -260,7 +237,6 @@ if not st.session_state.results:
     """, unsafe_allow_html=True)
 
 else:
-    # KPI
     sorted_res = sorted(st.session_state.results, key=lambda x: x['scores']['global'], reverse=True)
     avg = int(statistics.mean([r['scores']['global'] for r in sorted_res])) if sorted_res else 0
     
@@ -272,15 +248,14 @@ else:
     
     st.write("") 
 
-    # LISTE
     for idx, d in enumerate(sorted_res):
         i = d['infos']
         s = d['scores']
+        # Clé unique pour les widgets Streamlit dans la boucle
         unique_key = f"chart_{idx}_{uuid.uuid4()}"
         
         with st.expander(f"{i['nom']}  —  {s['global']}%", expanded=(idx==0)):
             
-            # Header
             st.markdown(f"""
             <div class="header-row">
                 <div>
@@ -296,10 +271,8 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
-            # Verdict
             st.markdown(f"""<div class="verdict">{d['analyse']['verdict']}</div>""", unsafe_allow_html=True)
             
-            # Grid
             gc1, gc2 = st.columns(2)
             with gc1:
                 forces = "".join([f"<span class='list-item'>+ {f}</span>" for f in d['analyse']['points_forts'][:4]])
@@ -310,7 +283,6 @@ else:
             
             st.divider()
             
-            # Details
             col_g, col_d = st.columns([2, 1])
             with col_g:
                 st.markdown("#### 📅 Parcours")
@@ -319,7 +291,7 @@ else:
                     for h in d['historique'][:3]:
                         tl_html += f"""
                         <div class="tl-item">
-                            <span class="tl-date">{h['duree']}</span>
+                            <div class="tl-date">{h['duree']}</div>
                             <div class="tl-title">{h['titre']} @ {h['entreprise']}</div>
                             <div class="tl-desc">{h['resume_synthetique']}</div>
                         </div>"""
