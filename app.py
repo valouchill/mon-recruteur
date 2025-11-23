@@ -128,7 +128,7 @@ def analyze_candidate(job, cv, criteria="", file_id=""):
     if not client: 
         return None
     
-    # --- PROMPT AVEC HYPER-RAFFINEMENT DU SCORING ---
+    # --- PROMPT AVEC MÉTHODOLOGIE DE SCORING ET SALAIRE AFFINÉE ---
     prompt = f"""
     ID_ANALYSIS: {file_id}
     ROLE: Expert Recrutement & Chasseur de Têtes.
@@ -138,29 +138,20 @@ def analyze_candidate(job, cv, criteria="", file_id=""):
     
     TACHE: Analyse critique et Scoring Détaillé.
     
-    METHODOLOGIE DE SCORING (STRICT ET PONDÉRÉ):
-    L'objectif est l'adéquation exacte au poste, pas la simple qualité du CV.
-    
-    POIDS: Le score GLOBAL est calculé par vous (IA) avec cette pondération obligatoire: 
-    - SCORE TECH (40%)
-    - SCORE EXPERIENCE (40%)
-    - SCORE SOFT (10%)
-    - SCORE FIT (10%)
-    
-    ÉCHELLE DE NOTATION OBLIGATOIRE: 
-    - 0-30: Profil Inadéquat. Manque des prérequis **MANDATORY**s (compétences ou expérience clés). Forte pénalité si un critère dans OFFRE/CRITERES est NON négociable et manquant.
-    - 31-60: Potentiel ou Junior. Correspond aux exigences **NICE-TO-HAVE** mais manque de la séniorité ou des outils cruciaux.
-    - 61-80: Bon Match. Possède l'expérience nécessaire et la majorité des compétences **MANDATORY**s. Un candidat à considérer sérieusement.
-    - 81-100: Excellent Match/Expert. Dépasse les attentes dans la plupart des domaines. Match presque parfait.
-
-    - SCORE TECH (0-100): Évalue la profondeur et l'alignement des compétences techniques du CV avec l'OFFRE/CRITERES.
-    - SCORE EXPERIENCE (0-100): Évalue la pertinence et la durée (nombre d'années) des rôles précédents par rapport à la séniorité exigée.
-    - SCORE SOFT (0-100): Évalue les qualités comportementales (leadership, communication, autonomie).
-    - SCORE FIT (0-100): Évalue l'adéquation géographique, salariale et motivationnelle.
+    METHODOLOGIE DE SCORING (STRICT):
+    Le score Global est la moyenne pondérée calculée par vous (IA). L'objectif est l'adéquation au poste, pas la simple qualité du CV.
+    - SCORE GLOBAL (0-100): Moyenne des autres scores. Prioriser Tech & Expérience > Soft & Fit.
+    - SCORE TECH (0-100): Évalue la profondeur, la maîtrise et l'alignement des compétences techniques du CV avec les exigences strictes de l'OFFRE et des CRITERES. 
+    - SCORE EXPERIENCE (0-100): Évalue la pertinence des rôles précédents, la durée dans des fonctions similaires, et la taille/le type d'entreprise par rapport aux attentes du poste.
+    - SCORE SOFT (0-100): Évalue les qualités comportementales (leadership, autonomie, communication) déduites des descriptions de missions du CV par rapport au profil de rôle idéal.
+    - SCORE FIT (0-100): Évalue l'adéquation géographique, les attentes salariales (si déduites), et l'alignement de la trajectoire professionnelle/motivation avec l'opportunité.
 
     ÉVALUATION SALARIALE (SALAIRE):
-    - Estimer la fourchette salariale annuelle brute (min-max en k€, exemple 45-55) pour le profil en se basant sur : Niveau d'Expérience, Rareté des Compétences MATCHÉES et Localisation.
-    - CONFIANCE (Haute/Moyenne/Basse) : La confiance doit refléter la clarté du parcours.
+    - Estimer la fourchette salariale annuelle brute (min-max en k€, exemple 45-55) pour le profil en se basant sur :
+        1. **Niveau d'Expérience et Rôle :** Nombre d'années et pertinence des responsabilités par rapport à la séniorité exigée.
+        2. **Rareté des Compétences :** Rareté et demande des compétences techniques MATCHÉES au poste et non facilement trouvables.
+        3. **Localisation :** Le coût de la vie/marché local pour la ville ou la région mentionnée dans le CV.
+    - CONFIANCE (Haute/Moyenne/Basse) : La confiance doit refléter la clarté du parcours, la quantité d'informations salariales déductibles et la standardisation du marché pour ce rôle.
     - ANALYSE : Court commentaire (max 1 ligne) justifiant l'estimation.
 
     QUESTIONS D'ENTRETIEN (ENTRETIEN):
@@ -374,7 +365,7 @@ else:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                cat = ['Tech (40%)', 'Exp (40%)', 'Soft (10%)', 'Fit (10%)', 'Tech (40%)']
+                cat = ['Tech', 'Exp', 'Soft', 'Fit', 'Tech']
                 val = [s['tech'], s['experience'], s['soft'], s['fit'], s['tech']]
                 fig = go.Figure(go.Scatterpolar(
                     r=val, theta=cat, fill='toself',
@@ -407,6 +398,7 @@ else:
             for i, q in enumerate(d['entretien']):
                 target_col = q_col1 if i % 2 == 0 else q_col2
                 with target_col:
+                    # Ajout d'une logique pour adapter le style basé sur le thème
                     theme_color = 'var(--primary)'
                     if q.get('theme') == 'Technique':
                         theme_color = '#059669' # Vert
