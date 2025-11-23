@@ -152,7 +152,15 @@ def analyze_candidate(job, cv, criteria="", file_id=""):
         2. **Rareté des Compétences :** Rareté et demande des compétences techniques MATCHÉES au poste et non facilement trouvables.
         3. **Localisation :** Le coût de la vie/marché local pour la ville ou la région mentionnée dans le CV.
     - CONFIANCE (Haute/Moyenne/Basse) : La confiance doit refléter la clarté du parcours, la quantité d'informations salariales déductibles et la standardisation du marché pour ce rôle.
-    - ANALYSE : Court commentaire (max 1 ligne) justifiant l'estimation (ex: "Séniorité confirmée et compétences rares en X justifient une fourchette haute.").
+    - ANALYSE : Court commentaire (max 1 ligne) justifiant l'estimation.
+
+    QUESTIONS D'ENTRETIEN (ENTRETIEN):
+    - **Générer exactement 6 questions de challenge** basées sur le CV, l'OFFRE et les CRITERES.
+    - La structure doit être:
+        - **2 questions** avec le "theme": "**Technique**" (pour valider les compétences clés).
+        - **2 questions** avec le "theme": "**Soft Skill**" (pour évaluer le comportement et le management).
+        - **2 questions** avec le "theme": "**Challenge**" ou "**Motivation**" (pour évaluer la résilience et l'ambition).
+    - Pour chaque question, l'"attendu" doit indiquer brièvement la réponse idéale du candidat.
 
     JSON STRICT:
     {{
@@ -390,9 +398,16 @@ else:
             for i, q in enumerate(d['entretien']):
                 target_col = q_col1 if i % 2 == 0 else q_col2
                 with target_col:
+                    # Ajout d'une logique pour adapter le style basé sur le thème
+                    theme_color = 'var(--primary)'
+                    if q.get('theme') == 'Technique':
+                        theme_color = '#059669' # Vert
+                    elif q.get('theme') == 'Soft Skill':
+                        theme_color = '#f97316' # Orange
+                    
                     st.markdown(f"""
-                    <div class="question-box">
-                        <div class="q-theme">{q.get('theme', 'Question')}</div>
+                    <div class="question-box" style="border-left-color: {theme_color};">
+                        <div class="q-theme" style="color: {theme_color};">{q.get('theme', 'Question')}</div>
                         <div class="q-text">❓ {q.get('question')}</div>
                         <div class="q-answer">💡 Attendu : {q.get('attendu')}</div>
                     </div>
