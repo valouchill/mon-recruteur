@@ -509,6 +509,7 @@ with st.sidebar:
 
     st.subheader("🔒 Options")
     anonymize = st.checkbox("Anonymiser l'affichage (PII masquées)", value=False)
+    st.session_state["anonymize"] = anonymize
     dedupe_on = st.checkbox("Dédoublonner par email/téléphone", value=True)
     max_workers = st.number_input("Concurrence (threads)", min_value=1, max_value=8, value=3, step=1)
     qualify_threshold = st.slider("Seuil qualifié (Score ≥)", 0, 100, 70)
@@ -546,7 +547,7 @@ def hash_identity(email: str, tel: str) -> str:
 
 def anonymize_infos(i: Dict[str, Any]) -> Dict[str, Any]:
     ret = dict(i)
-    if ret.get("email"): ret["email"] = re.sub(r"(^.).+(@.+$)", r"\\1***\\2", ret["email"])  # a***@domaine
+    if ret.get("email"): ret["email"] = re.sub(r"(^.).+(@.+$)", r"\1***\2", ret["email"])  # a***@domaine
     if ret.get("tel"):
         t = re.sub(r"\D", "", ret["tel"])
         ret["tel"] = "✱✱✱✱ " + (t[-4:] if len(t)>=4 else "✱✱✱✱")
@@ -655,7 +656,7 @@ else:
 
     for idx, d in enumerate(filtered):
         i = d["infos"]; s = d["scores"]
-        i_disp = anonymize_infos(i) if st.session_state.get("anonymize", False) else (anonymize_infos(i) if 'anonymize' in locals() and anonymize else i)
+        i_disp = anonymize_infos(i) if st.session_state.get("anonymize", False) else i
 
         if s.get("global", 0) >= 75:
             score_class, score_emoji = "score-high", "🌟"
