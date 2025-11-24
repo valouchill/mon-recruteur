@@ -1,4 +1,4 @@
-# AI Recruiter PRO — v17 (Evidence-Based Scoring)
+# AI Recruiter PRO — v17.1 (Corrigé : Import statistics ajouté)
 # -------------------------------------------------------------------
 from __future__ import annotations
 
@@ -8,6 +8,9 @@ import datetime as dt
 from typing import Optional, Dict, List, Any, Tuple
 from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# IMPORT MANQUANT AJOUTÉ ICI
+import statistics 
 
 # Data / Viz
 import pandas as pd
@@ -19,6 +22,8 @@ from pydantic import BaseModel, Field, ValidationError, conint
 # API Clients
 import openai
 from pypdf import PdfReader
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # -----------------------------
 # 0. CONFIGURATION PAGE
@@ -281,16 +286,17 @@ else:
     sorted_results = sorted(st.session_state.results, key=lambda x: x['scores']['global'], reverse=True)
     
     # KPIs
-    avg = int(statistics.mean([r['scores']['global'] for r in sorted_results]))
-    qualified = len([r for r in sorted_results if r['scores']['global'] >= 70])
-    
-    k1, k2, k3, k4 = st.columns(4)
-    k1.markdown(f"<div class='kpi-card'><div class='kpi-val'>{len(sorted_results)}</div><div class='kpi-label'>Audits Réalisés</div></div>", unsafe_allow_html=True)
-    k2.markdown(f"<div class='kpi-card'><div class='kpi-val'>{avg}/100</div><div class='kpi-label'>Score Moyen</div></div>", unsafe_allow_html=True)
-    k3.markdown(f"<div class='kpi-card'><div class='kpi-val' style='color:var(--score-good)'>{qualified}</div><div class='kpi-label'>Profils Validés</div></div>", unsafe_allow_html=True)
-    k4.markdown(f"<div class='kpi-card'><div class='kpi-val'>{sorted_results[0]['scores']['global']}</div><div class='kpi-label'>Top Score</div></div>", unsafe_allow_html=True)
-    
-    st.write("---")
+    if sorted_results:
+        avg = int(statistics.mean([r['scores']['global'] for r in sorted_results]))
+        qualified = len([r for r in sorted_results if r['scores']['global'] >= 70])
+        
+        k1, k2, k3, k4 = st.columns(4)
+        k1.markdown(f"<div class='kpi-card'><div class='kpi-val'>{len(sorted_results)}</div><div class='kpi-label'>Audits Réalisés</div></div>", unsafe_allow_html=True)
+        k2.markdown(f"<div class='kpi-card'><div class='kpi-val'>{avg}/100</div><div class='kpi-label'>Score Moyen</div></div>", unsafe_allow_html=True)
+        k3.markdown(f"<div class='kpi-card'><div class='kpi-val' style='color:var(--score-good)'>{qualified}</div><div class='kpi-label'>Profils Validés</div></div>", unsafe_allow_html=True)
+        k4.markdown(f"<div class='kpi-card'><div class='kpi-val'>{sorted_results[0]['scores']['global']}</div><div class='kpi-label'>Top Score</div></div>", unsafe_allow_html=True)
+        
+        st.write("---")
     
     for idx, d in enumerate(sorted_results):
         score = d['scores']['global']
