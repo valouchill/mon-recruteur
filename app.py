@@ -712,8 +712,11 @@ else:
                     hist = d.get("historique", [])
                     if hist:
                         for h in hist[:4]:
-                            st.markdown(
-                                f"**{h.get('titre','')}** @ {h.get('entreprise','')} — {h.get('duree','')}
+st.markdown(
+    f"""**{h.get('titre','')}** @ {h.get('entreprise','')} — {h.get('duree','')}
+> _{h.get('resume_synthetique','')}_"""
+)
+
 
 > _{h.get('resume_synthetique','')}_"
                             )
@@ -768,4 +771,5 @@ else:
             if st.session_state.get("debug"):
                 st.caption("FIN DE FICHE — DEBUG")
                 st.json(d)
+
 
