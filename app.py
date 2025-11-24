@@ -1,4 +1,4 @@
-# AI Recruiter PRO — v17.2 (Scoring Punitif & Import Corrigé)
+# AI Recruiter PRO — v17.3 (Alertes Bloquantes Restaurées)
 # -------------------------------------------------------------------
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from typing import Optional, Dict, List, Any, Tuple
 from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# IMPORT ESSENTIEL
 import statistics 
 
 # Data / Viz
@@ -28,27 +27,22 @@ from oauth2client.service_account import ServiceAccountCredentials
 # -----------------------------
 # 0. CONFIGURATION PAGE
 # -----------------------------
-st.set_page_config(page_title="AI Recruiter PRO v17", layout="wide", page_icon="🛡️", initial_sidebar_state="expanded")
+st.set_page_config(page_title="AI Recruiter PRO v17.3", layout="wide", page_icon="🛡️", initial_sidebar_state="expanded")
 
 st.markdown("""
 <style>
-    :root {
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    :root { 
         --primary:#2563eb; --bg-app:#f8fafc; --text-main:#0f172a; --border:#cbd5e1;
         --score-good:#16a34a; --score-mid:#d97706; --score-bad:#dc2626;
     }
     .stApp { background: var(--bg-app); color: var(--text-main); font-family: 'Inter', sans-serif; }
     
-    /* CARDS & LAYOUT */
-    .candidate-card { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
-    .header-flex { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #f1f5f9; padding-bottom: 15px; margin-bottom: 15px; }
-    
-    /* TYPOGRAPHY */
-    h1, h2, h3 { color: #1e293b !important; font-weight: 700; }
+    /* UI ELEMENTS */
     .name-title { font-size: 1.4rem; font-weight: 800; color: #1e293b; margin: 0; }
     .job-subtitle { font-size: 0.95rem; color: #64748b; margin-top: 4px; }
     .section-header { font-size: 0.85rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; margin-bottom: 10px; letter-spacing: 0.5px; }
 
-    /* SCORE BADGE */
     .score-badge { 
         font-size: 1.5rem; font-weight: 900; color: white; 
         width: 60px; height: 60px; border-radius: 12px; 
@@ -59,27 +53,50 @@ st.markdown("""
     .sc-mid { background: linear-gradient(135deg, #d97706, #b45309); }
     .sc-bad { background: linear-gradient(135deg, #dc2626, #b91c1c); }
 
-    /* EVIDENCE BOXES */
+    /* EVIDENCE & ALERTS */
     .evidence-box { background: #f8fafc; border-left: 3px solid #cbd5e1; padding: 10px 15px; margin-bottom: 8px; border-radius: 0 6px 6px 0; }
     .ev-skill { font-weight: 700; color: #334155; font-size: 0.9rem; }
     .ev-proof { font-size: 0.85rem; color: #475569; font-style: italic; margin-top: 2px; }
-    .ev-missing { border-left-color: #ef4444; background: #fef2f2; }
-    .ev-missing .ev-skill { color: #991b1b; }
+    
+    /* BLOCS DE DISQUALIFICATION (STYLE RESTAURÉ) */
+    .disqualify-box {
+        background-color: #fef2f2;
+        border: 1px solid #fecaca;
+        border-left: 5px solid #dc2626;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        color: #991b1b;
+    }
+    .alert-box {
+        background-color: #fff7ed;
+        border: 1px solid #fed7aa;
+        border-left: 5px solid #ea580c;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        color: #9a3412;
+    }
 
-    /* TAGS */
     .tag { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; margin-right: 5px; margin-bottom: 5px; }
     .tag-blue { background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; }
-    .tag-gray { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+    
+    .kpi-card { background: white; padding: 20px; border: 1px solid var(--border); border-radius: 8px; text-align: center; height: 100%; }
+    .kpi-val { font-size: 1.6rem; font-weight: 700; color: var(--primary); margin-bottom: 5px; }
+    .kpi-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
 
-    /* INPUTS FIX */
+    /* FIXES */
     .stTextArea textarea, .stTextInput input { background-color: white !important; color: #0f172a !important; border: 1px solid #cbd5e1 !important; }
     [data-testid="stFileUploader"] section { background: white !important; border: 1px dashed #cbd5e1 !important; }
     div[data-testid="stExpander"] { border: 1px solid #e2e8f0 !important; border-radius: 8px !important; background: white !important; box-shadow: none !important;}
+    .streamlit-expanderHeader { background-color: white !important; color: var(--text-main) !important; font-weight: 600; border-bottom: 1px solid #f1f5f9; }
+    .streamlit-expanderHeader:hover { color: var(--primary) !important; }
+    .streamlit-expanderHeader svg { fill: var(--text-sub) !important; }
 </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------
-# 1. SCHÉMAS DE DONNÉES (STRICT)
+# 1. SCHÉMAS DE DONNÉES
 # -----------------------------
 class Infos(BaseModel):
     nom: str = "Candidat Inconnu"; email: str = "N/A"; tel: str = "N/A"; ville: str = ""; linkedin: str = ""; poste_actuel: str = ""
@@ -89,11 +106,11 @@ class Scores(BaseModel):
     tech: int = 0; experience: int = 0; fit: int = 0
 
 class Preuve(BaseModel):
-    skill: str; preuve: str; niveau: str # Niveau: Faible, Bon, Expert
+    skill: str; preuve: str; niveau: str
 
 class Competences(BaseModel):
-    match_details: List[Preuve] = [] # Liste des preuves
-    manquant_critique: List[str] = [] # Dealbreakers
+    match_details: List[Preuve] = []
+    manquant_critique: List[str] = [] # C'est ici que sont stockés les points bloquants
     manquant_secondaire: List[str] = []
 
 class Analyse(BaseModel):
@@ -116,7 +133,7 @@ class CandidateData(BaseModel):
 DEFAULT_DATA = CandidateData().dict(by_alias=True)
 
 # -----------------------------
-# 2. FONCTIONS UTILITAIRES
+# 2. OUTILS
 # -----------------------------
 @st.cache_resource(show_spinner=False)
 def get_client() -> Optional[openai.OpenAI]:
@@ -127,10 +144,9 @@ def get_client() -> Optional[openai.OpenAI]:
     except: return None
 
 def clean_pdf_text(text: str) -> str:
-    # Nettoyage des caractères bizarres issus du PDF
-    text = re.sub(r'\s+', ' ', text) # Espaces multiples
-    text = re.sub(r'[^\w\s@.+:/-]', '', text) # Caractères non-alphanumériques (sauf ponctuation basique)
-    return text[:6000] # On coupe pour éviter de saturer le contexte
+    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r'[^\w\s@.+:/-]', '', text)
+    return text[:6000]
 
 def extract_pdf_safe(file_bytes: bytes) -> str:
     try:
@@ -146,44 +162,34 @@ def normalize_json(raw: Dict[str, Any]) -> Dict[str, Any]:
         return deepcopy(DEFAULT_DATA)
 
 # -----------------------------
-# 3. LE COEUR : L'AUDITEUR (PROMPT PUNITIF)
+# 3. AUDITEUR (PROMPT RENFORCÉ SUR LES BLOQUANTS)
 # -----------------------------
 AUDITOR_PROMPT = """
-ROLE: Auditeur de Recrutement Impitoyable (Sanction Immédiate).
+ROLE: Auditeur de Recrutement Impitoyable.
 TACHE: Vérifier factuellement l'adéquation CV vs OFFRE.
-PRINCIPE: "Pas écrit = Pas acquis".
 
-RÈGLES DE SCORING PUNITIF (PRIORITÉ ABSOLUE):
-1. IDENTIFICATION DES DEALBREAKERS :
-   - Regarde la section "CRITERES IMPERATIFS" fournie.
-   - Si le CV ne mentionne pas EXPLICITEMENT un de ces critères (ex: "Anglais courant", "Expérience 5 ans", "Python"), c'est un MANQUE CRITIQUE.
-
-2. CALCUL DU SCORE GLOBAL (0-100) :
-   - Si UN SEUL manquant critique est détecté : Le score GLOBAL est plafonné à 40/100 MAXIMUM. (C'est éliminatoire).
-   - Si TOUS les critiques sont présents :
-     * Départ à 100.
-     * -10 points par compétence secondaire manquante.
-     * -15 points si l'expérience est trop courte.
-     * -15 points pour des "Red Flags" (instabilité, trous).
-
-3. PREUVES OBLIGATOIRES :
-   - Tu ne peux valider une compétence QUE si tu peux citer le CV. Sinon, c'est un manquant.
+RÈGLES PRIORITAIRES POUR LES BLOQUANTS (DEALBREAKERS):
+1. IDENTIFICATION : Compare le CV à la liste des "CRITERES IMPERATIFS". 
+2. SANCTION : Si un critère impératif n'est pas EXPLICITEMENT dans le CV, tu DOIS l'ajouter dans la liste 'manquant_critique'.
+3. SCORING : 
+   - Si 'manquant_critique' n'est pas vide -> Score Global MAXIMUM = 40/100.
+   - Si 'red_flags' (trous, instabilité) -> -15 points.
 
 STRUCTURE JSON REQUISE :
 {
     "infos": { "nom": "Nom complet", "email": "...", "tel": "...", "ville": "...", "linkedin": "...", "poste_actuel": "..." },
     "scores": { "global": int, "tech": int (0-10), "experience": int (0-10), "fit": int (0-10) },
     "competences": {
-        "match_details": [ {"skill": "Nom Skill", "preuve": "Citation du CV prouvant la skill", "niveau": "Expert/Confirmé/Junior"} ],
-        "manquant_critique": ["LISTE DES DEALBREAKERS MANQUANTS ICI"],
+        "match_details": [ {"skill": "Nom Skill", "preuve": "Citation exacte du CV", "niveau": "Expert/Confirmé/Junior"} ],
+        "manquant_critique": ["Critère 1 Manquant", "Critère 2 Manquant"],
         "manquant_secondaire": ["Skill C"]
     },
     "analyse": {
-        "verdict_auditeur": "Phrase tranchante. Si score < 40, commence par 'DISQUALIFIÉ : ...'.",
-        "red_flags": ["Flag 1", "Flag 2"]
+        "verdict_auditeur": "Phrase de synthèse.",
+        "red_flags": ["Flag 1 (ex: Job hopping)", "Flag 2"]
     },
-    "historique": [ {"titre": "...", "entreprise": "...", "duree": "...", "contexte": "Secteur/Taille"} ],
-    "entretien": [ {"cible": "Lacune identifiée", "question": "Question piège pour vérifier", "reponse_attendue": "..."} ]
+    "historique": [ {"titre": "...", "entreprise": "...", "duree": "...", "contexte": "..."} ],
+    "entretien": [ {"cible": "Lacune", "question": "Question piège", "reponse_attendue": "..."} ]
 }
 """
 
@@ -201,7 +207,7 @@ def audit_candidate(job: str, cv: str, criteria: str, file_id: str) -> Optional[
                 {"role": "user", "content": user_prompt}
             ],
             response_format={"type": "json_object"},
-            temperature=0.0 # Zéro créativité, 100% factuel
+            temperature=0.0
         )
         return normalize_json(json.loads(res.choices[0].message.content))
     except Exception as e:
@@ -229,7 +235,6 @@ def save_result(data, job_title):
 # 4. INTERFACE UTILISATEUR
 # -----------------------------
 
-# SIDEBAR
 with st.sidebar:
     st.title("🛡️ Paramètres Audit")
     ao_file = st.file_uploader("1. Fiche de Poste (PDF)", type="pdf", key="ao")
@@ -242,7 +247,7 @@ with st.sidebar:
     elif ao_txt:
         job_content = ao_txt
         
-    criteria = st.text_area("2. Critères éliminatoires (Dealbreakers)", height=100, placeholder="Ex: Anglais C1 obligatoire, Expérience management > 3 ans...")
+    criteria = st.text_area("2. Critères Éliminatoires (Dealbreakers)", height=100, placeholder="Ex: Anglais courant, Python > 5 ans...")
     
     cv_files = st.file_uploader("3. Dossiers Candidats (PDF)", type="pdf", accept_multiple_files=True)
     
@@ -256,7 +261,6 @@ with st.sidebar:
 
 if "results" not in st.session_state: st.session_state.results = []
 
-# LOGIQUE
 if launch:
     if not job_content or len(job_content) < 50:
         st.error("⚠️ La fiche de poste est vide ou illisible.")
@@ -284,13 +288,11 @@ if launch:
 if not st.session_state.results:
     st.info("👈 Veuillez charger une offre et des CVs pour démarrer l'audit de fiabilité.")
 else:
-    # Tri : Les meilleurs scores en premier
     sorted_results = sorted(st.session_state.results, key=lambda x: x['scores']['global'], reverse=True)
     
-    # KPIs
     if sorted_results:
         avg = int(statistics.mean([r['scores']['global'] for r in sorted_results]))
-        qualified = len([r for r in sorted_results if r['scores']['global'] >= 60])
+        qualified = len([r for r in sorted_results if r['scores']['global'] >= 70])
         
         k1, k2, k3, k4 = st.columns(4)
         k1.markdown(f"<div class='kpi-card'><div class='kpi-val'>{len(sorted_results)}</div><div class='kpi-label'>Audits Réalisés</div></div>", unsafe_allow_html=True)
@@ -303,15 +305,19 @@ else:
     for idx, d in enumerate(sorted_results):
         score = d['scores']['global']
         
-        # Code couleur score
+        # Détection des problèmes pour l'icône
+        has_critical_issues = len(d['competences']['manquant_critique']) > 0
+        has_red_flags = len(d['analyse']['red_flags']) > 0
+        
         if score >= 70: s_cls = "sc-good"
         elif score >= 50: s_cls = "sc-mid"
         else: s_cls = "sc-bad"
         
-        # Clé unique obligatoire pour éviter les bugs d'affichage
-        expander_key = f"exp_{idx}_{d['infos']['nom']}"
+        # Titre dynamique avec indicateur d'alerte
+        alert_icon = "🚩 " if (has_critical_issues or has_red_flags) else ""
+        expander_label = f"{alert_icon}{d['infos']['nom']} — Score: {score}/100"
         
-        with st.expander(f"{d['infos']['nom']} — Score Audit : {score}/100", expanded=(idx==0)):
+        with st.expander(expander_label, expanded=(idx==0)):
             
             # EN-TÊTE
             c_main, c_score = st.columns([4, 1])
@@ -326,14 +332,27 @@ else:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # VERDICT AUDITEUR
-                if d['analyse']['red_flags']:
-                    for flag in d['analyse']['red_flags']:
-                        st.error(f"🚩 ALERTE : {flag}")
+                st.write("") # Espace
+
+                # --- BLOCS D'ALERTES RESTAURÉS ET RENFORCÉS ---
                 
-                # Afficher les dealbreakers en haut
+                # 1. Points Bloquants (Critères Impératifs)
                 if d['competences']['manquant_critique']:
-                     st.error(f"⛔ **DISQUALIFICATION :** Manque de {', '.join(d['competences']['manquant_critique'])}")
+                    st.markdown(f"""
+                    <div class='disqualify-box'>
+                        <b>⛔ DISQUALIFICATION (Critères Impératifs Manquants) :</b><br>
+                        {'<br>'.join([f'- {m}' for m in d['competences']['manquant_critique']])}
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # 2. Red Flags (Doutes Auditeur)
+                if d['analyse']['red_flags']:
+                    st.markdown(f"""
+                    <div class='alert-box'>
+                        <b>🚩 ALERTE AUDITEUR (Red Flags) :</b><br>
+                        {'<br>'.join([f'- {f}' for f in d['analyse']['red_flags']])}
+                    </div>
+                    """, unsafe_allow_html=True)
                 
                 st.info(f"💡 **Verdict Auditeur :** {d['analyse']['verdict_auditeur']}")
 
@@ -343,11 +362,11 @@ else:
 
             st.divider()
             
-            # COLONNES PREUVES VS MANQUES
+            # COLONNES PREUVES VS SECONDAIRES
             col_match, col_miss = st.columns(2)
             
             with col_match:
-                st.markdown("<div class='section-header'>✅ Compétences Prouvées (Avec Justificatifs)</div>", unsafe_allow_html=True)
+                st.markdown("<div class='section-header'>✅ Compétences Prouvées</div>", unsafe_allow_html=True)
                 if d['competences']['match_details']:
                     for item in d['competences']['match_details']:
                         st.markdown(f"""
@@ -360,20 +379,11 @@ else:
                     st.caption("Aucune compétence majeure prouvée.")
 
             with col_miss:
-                st.markdown("<div class='section-header'>❌ Points Bloquants & Manquants</div>", unsafe_allow_html=True)
-                # Critiques
-                if d['competences']['manquant_critique']:
-                    for m in d['competences']['manquant_critique']:
-                        st.markdown(f"""
-                        <div class='evidence-box ev-missing'>
-                            <div class='ev-skill'>CRITIQUE : {m}</div>
-                            <div class='ev-proof'>Absence totale détectée dans le CV.</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                
-                # Secondaires
+                st.markdown("<div class='section-header'>⚠️ Manques Secondaires</div>", unsafe_allow_html=True)
                 if d['competences']['manquant_secondaire']:
-                    st.markdown("**Secondaires :** " + ", ".join([f"<span style='color:#64748b'>{x}</span>" for x in d['competences']['manquant_secondaire']]), unsafe_allow_html=True)
+                    st.markdown(", ".join([f"<span style='color:#64748b'>{x}</span>" for x in d['competences']['manquant_secondaire']]), unsafe_allow_html=True)
+                else:
+                    st.caption("Rien à signaler.")
 
             st.divider()
             
