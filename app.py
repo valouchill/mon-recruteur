@@ -1,4 +1,4 @@
-# AI Recruiter PRO — v17.1 (Corrigé : Import statistics ajouté)
+# AI Recruiter PRO — v17.2 (Scoring Punitif & Import Corrigé)
 # -------------------------------------------------------------------
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Optional, Dict, List, Any, Tuple
 from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# IMPORT MANQUANT AJOUTÉ ICI
+# IMPORT ESSENTIEL
 import statistics 
 
 # Data / Viz
@@ -146,38 +146,40 @@ def normalize_json(raw: Dict[str, Any]) -> Dict[str, Any]:
         return deepcopy(DEFAULT_DATA)
 
 # -----------------------------
-# 3. LE COEUR : L'AUDITEUR (PROMPT)
+# 3. LE COEUR : L'AUDITEUR (PROMPT PUNITIF)
 # -----------------------------
 AUDITOR_PROMPT = """
-ROLE: Auditeur de Recrutement Impitoyable.
+ROLE: Auditeur de Recrutement Impitoyable (Sanction Immédiate).
 TACHE: Vérifier factuellement l'adéquation CV vs OFFRE.
-PRINCIPE: "Pas écrit = Pas acquis". Ne jamais supposer. Si un doute existe, c'est une absence.
+PRINCIPE: "Pas écrit = Pas acquis".
 
-RÈGLES DE SCORING (DÉTERMINISTE):
-1. SCORE GLOBAL (0-100) :
-   - Départ à 100 points.
-   - Moins 20 points par compétence CRITIQUE manquante.
-   - Moins 5 points par compétence SECONDAIRE manquante.
-   - Moins 10 points si l'expérience est insuffisante (années ou secteur).
-   - Moins 15 points si un RED FLAG est détecté (trous inexpliqués, job hopping excessif, fautes graves).
-   - Plancher à 0.
+RÈGLES DE SCORING PUNITIF (PRIORITÉ ABSOLUE):
+1. IDENTIFICATION DES DEALBREAKERS :
+   - Regarde la section "CRITERES IMPERATIFS" fournie.
+   - Si le CV ne mentionne pas EXPLICITEMENT un de ces critères (ex: "Anglais courant", "Expérience 5 ans", "Python"), c'est un MANQUE CRITIQUE.
 
-2. PREUVES (CRUCIAL) :
-   - Pour chaque compétence "matchée", tu DOIS extraire une CITATION ou un CONTEXTE précis du CV.
-   - Exemple: Skill "Python" -> Preuve: "A développé une API Django chez Thales (3 ans)".
-   - Si tu ne trouves pas de preuve explicite, classe-le dans "manquant".
+2. CALCUL DU SCORE GLOBAL (0-100) :
+   - Si UN SEUL manquant critique est détecté : Le score GLOBAL est plafonné à 40/100 MAXIMUM. (C'est éliminatoire).
+   - Si TOUS les critiques sont présents :
+     * Départ à 100.
+     * -10 points par compétence secondaire manquante.
+     * -15 points si l'expérience est trop courte.
+     * -15 points pour des "Red Flags" (instabilité, trous).
 
-3. STRUCTURE JSON REQUISE :
+3. PREUVES OBLIGATOIRES :
+   - Tu ne peux valider une compétence QUE si tu peux citer le CV. Sinon, c'est un manquant.
+
+STRUCTURE JSON REQUISE :
 {
     "infos": { "nom": "Nom complet", "email": "...", "tel": "...", "ville": "...", "linkedin": "...", "poste_actuel": "..." },
     "scores": { "global": int, "tech": int (0-10), "experience": int (0-10), "fit": int (0-10) },
     "competences": {
         "match_details": [ {"skill": "Nom Skill", "preuve": "Citation du CV prouvant la skill", "niveau": "Expert/Confirmé/Junior"} ],
-        "manquant_critique": ["Skill A", "Skill B"],
+        "manquant_critique": ["LISTE DES DEALBREAKERS MANQUANTS ICI"],
         "manquant_secondaire": ["Skill C"]
     },
     "analyse": {
-        "verdict_auditeur": "Phrase de synthèse factuelle et tranchante.",
+        "verdict_auditeur": "Phrase tranchante. Si score < 40, commence par 'DISQUALIFIÉ : ...'.",
         "red_flags": ["Flag 1", "Flag 2"]
     },
     "historique": [ {"titre": "...", "entreprise": "...", "duree": "...", "contexte": "Secteur/Taille"} ],
@@ -189,7 +191,7 @@ def audit_candidate(job: str, cv: str, criteria: str, file_id: str) -> Optional[
     client = get_client()
     if not client: return None
     
-    user_prompt = f"ID_DOSSIER: {file_id}\n\n--- OFFRE ---\n{job[:2500]}\n\n--- CRITERES IMPERATIFS ---\n{criteria}\n\n--- CV CANDIDAT ---\n{cv[:4000]}"
+    user_prompt = f"ID_DOSSIER: {file_id}\n\n--- OFFRE ---\n{job[:2500]}\n\n--- CRITERES IMPERATIFS (DEALBREAKERS) ---\n{criteria}\n\n--- CV CANDIDAT ---\n{cv[:4000]}"
     
     try:
         res = client.chat.completions.create(
@@ -288,7 +290,7 @@ else:
     # KPIs
     if sorted_results:
         avg = int(statistics.mean([r['scores']['global'] for r in sorted_results]))
-        qualified = len([r for r in sorted_results if r['scores']['global'] >= 70])
+        qualified = len([r for r in sorted_results if r['scores']['global'] >= 60])
         
         k1, k2, k3, k4 = st.columns(4)
         k1.markdown(f"<div class='kpi-card'><div class='kpi-val'>{len(sorted_results)}</div><div class='kpi-label'>Audits Réalisés</div></div>", unsafe_allow_html=True)
@@ -328,6 +330,10 @@ else:
                 if d['analyse']['red_flags']:
                     for flag in d['analyse']['red_flags']:
                         st.error(f"🚩 ALERTE : {flag}")
+                
+                # Afficher les dealbreakers en haut
+                if d['competences']['manquant_critique']:
+                     st.error(f"⛔ **DISQUALIFICATION :** Manque de {', '.join(d['competences']['manquant_critique'])}")
                 
                 st.info(f"💡 **Verdict Auditeur :** {d['analyse']['verdict_auditeur']}")
 
