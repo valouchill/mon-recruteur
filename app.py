@@ -1,4 +1,4 @@
-# AI Recruiter PRO — v16
+# AI Recruiter PRO — v16 (DEBUG VERSION)
 # Scoring fiabilisé (règles déterministes + IA hybride + Ollama local)
 # -------------------------------------------------------------------
 
@@ -515,7 +515,7 @@ with st.sidebar:
     qualify_threshold = st.slider("Seuil qualifié (Score ≥)", 0, 100, 70)
 
     # Mode debug pour voir JSON/erreurs dans la fiche
-    debug_mode = st.checkbox("Mode debug (afficher JSON et erreurs)", value=False)
+    debug_mode = st.checkbox("Mode debug (afficher JSON et erreurs)", value=True)  # TRUE PAR DÉFAUT
     st.session_state["debug"] = debug_mode
 
     st.divider()
@@ -547,7 +547,7 @@ def hash_identity(email: str, tel: str) -> str:
 
 def anonymize_infos(i: Dict[str, Any]) -> Dict[str, Any]:
     ret = dict(i)
-    if ret.get("email"): ret["email"] = re.sub(r"(^.).+(@.+$)", r"\1***\2", ret["email"])  # a***@domaine
+    if ret.get("email"): ret["email"] = re.sub(r"(^.).+(@.+$)", r"\1***\2", ret["email"])
     if ret.get("tel"):
         t = re.sub(r"\D", "", ret["tel"])
         ret["tel"] = "✱✱✱✱ " + (t[-4:] if len(t)>=4 else "✱✱✱✱")
@@ -598,6 +598,13 @@ if launch_btn:
 # 7. VUES
 # -----------------------------
 results: List[Dict[str, Any]] = st.session_state.get("results", []) or []
+
+# DEBUG: Afficher l'état des résultats
+if st.session_state.get("debug"):
+    st.info(f"🔍 DEBUG: {len(results)} résultats dans st.session_state['results']")
+    if results:
+        st.write("Premier résultat:", results[0].keys())
+
 if not results:
     st.markdown("""
         <div style="text-align:center; padding:80px 20px;">
@@ -632,7 +639,6 @@ else:
         try:
             comp_sel = st.multiselect("Comparer (max 3)", options=names, default=names[:0], max_selections=3)
         except TypeError:
-            # fallback pour versions Streamlit sans max_selections
             comp_sel = st.multiselect("Comparer", options=names, default=names[:0])
 
     st.divider()
@@ -652,7 +658,15 @@ else:
             st.divider()
 
     filtered = [r for r in results_sorted if r["scores"]["global"] >= filter_val]
-    if not filtered: st.warning(f"Aucun candidat avec un score ≥ {filter_val}%")
+    
+    # DEBUG
+    if st.session_state.get("debug"):
+        st.info(f"🔍 DEBUG: {len(filtered)} candidats après filtrage (seuil: {filter_val}%)")
+    
+    if not filtered: 
+        st.warning(f"Aucun candidat avec un score ≥ {filter_val}%")
+    else:
+        st.success(f"📋 {len(filtered)} candidat(s) affiché(s)")
 
     for idx, d in enumerate(filtered):
         i = d["infos"]; s = d["scores"]
@@ -666,97 +680,101 @@ else:
             score_class, score_emoji = "score-low", "⚠️"
 
         with st.expander(f"{score_emoji} {i_disp.get('nom','Candidat')} — {s.get('global',0)}%", expanded=(idx == 0)):
-            if st.session_state.get("debug"):
-                st.caption("DEBUG: données brutes du candidat")
-                st.json(d)
-            try:
-                # Header
+            # Header
+            st.markdown(
+                f"""
+                <div style='display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:1px solid #f1f5f9;margin-bottom:12px;'>
+                    <div>
+                        <h3 style='margin:0'>{i_disp.get('nom','Candidat')}</h3>
+                        <div style='color:#334155'>{i_disp.get('poste_actuel','')} • {i_disp.get('ville','')}</div>
+                        <div style='margin-top:10px;'>
+                            <span class='skill-tag'>📧 {i_disp.get('email','N/A')}</span>
+                            <span class='skill-tag'>📞 {i_disp.get('tel','N/A')}</span>
+                            <span class='skill-tag'>🔗 {i_disp.get('linkedin','N/A')}</span>
+                        </div>
+                    </div>
+                    <div class='score-badge {score_class}'>{s.get('global',0)}%</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            st.markdown(f"""<div class='verdict'>💡 <strong>Verdict:</strong> {d.get('analyse',{}).get('verdict','N/A')}</div>""", unsafe_allow_html=True)
+
+            # Points forts / Vigilance
+            cA, cB = st.columns(2)
+            with cA:
+                forces = d.get("analyse", {}).get("points_forts", [])[:5]
+                st.markdown("**Points forts**")
+                if forces:
+                    for f in forces:
+                        st.write("✅ ", f)
+                else:
+                    st.caption("Aucun point fort identifié")
+            with cB:
+                risks = d.get("analyse", {}).get("points_faibles", [])[:5]
+                st.markdown("**Vigilance**")
+                if risks:
+                    for r in risks:
+                        st.write("❗ ", r)
+                else:
+                    st.caption("Aucun point de vigilance")
+
+            st.divider()
+            left, right = st.columns([2,1])
+
+            with left:
+                st.markdown("#### 📅 Parcours Professionnel")
+                hist = d.get("historique", [])
+                if hist:
+                    for h in hist[:4]:
+                        titre = h.get('titre',''); ent = h.get('entreprise',''); duree = h.get('duree',''); res = h.get('resume_synthetique','')
+                        st.markdown(f"**{titre}** @ {ent} — {duree}\n\n> _{res}_")
+                else:
+                    st.caption("Historique non disponible")
+
+            with right:
+                sal = d.get("salaire", {})
                 st.markdown(
                     f"""
-                    <div style='display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:1px solid #f1f5f9;margin-bottom:12px;'>
-                        <div>
-                            <h3 style='margin:0'>{i_disp.get('nom','Candidat')}</h3>
-                            <div style='color:#334155'>{i_disp.get('poste_actuel','')} • {i_disp.get('ville','')}</div>
-                            <div style='margin-top:10px;'>
-                                <span class='skill-tag'>📧 {i_disp.get('email','')}</span>
-                                <span class='skill-tag'>📞 {i_disp.get('tel','')}</span>
-                                <span class='skill-tag'>🔗 {i_disp.get('linkedin','')}</span>
-                            </div>
-                        </div>
-                        <div class='score-badge {score_class}'>{s.get('global',0)}%</div>
+                    <div style='padding:12px;border:1px solid #e2e8f0;border-radius:8px;background:white;text-align:center;'>
+                        <div style='font-size:0.75rem;color:#334155;text-transform:uppercase;'>Salaire Estimé</div>
+                        <div style='font-size:1.5rem;font-weight:800;color:var(--text-main);'>{sal.get('min',0)}–{sal.get('max',0)} k€</div>
+                        <div style='font-size:0.8rem;color:var(--primary);margin-top:4px;'>{sal.get('confiance','')}</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
+                # Radar
+                cat = ['Tech', 'Exp', 'Soft', 'Fit', 'Tech']
+                val = [s.get('tech',0), s.get('experience',0), s.get('soft',0), s.get('fit',0), s.get('tech',0)]
+                fig = go.Figure(go.Scatterpolar(r=val, theta=cat, fill='toself'))
+                fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=False, height=240, margin=dict(t=10,b=10,l=10,r=10))
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-                st.markdown(f"""<div class='verdict'>💡 <strong>Verdict:</strong> {d.get('analyse',{}).get('verdict','')}</div>""", unsafe_allow_html=True)
-
-                # Points forts / Vigilance
-                cA, cB = st.columns(2)
-                with cA:
-                    forces = d.get("analyse", {}).get("points_forts", [])[:5]
-                    st.markdown("**Points forts**")
-                    for f in forces:
-                        st.write("✅ ", f)
-                with cB:
-                    risks = d.get("analyse", {}).get("points_faibles", [])[:5]
-                    st.markdown("**Vigilance**")
-                    for r in risks:
-                        st.write("❗ ", r)
-
-                st.divider()
-                left, right = st.columns([2,1])
-
-                with left:
-                    st.markdown("#### 📅 Parcours Professionnel")
-                    hist = d.get("historique", [])
-                    if hist:
-                        for h in hist[:4]:
-                            titre = h.get('titre',''); ent = h.get('entreprise',''); duree = h.get('duree',''); res = h.get('resume_synthetique','')
-                            st.markdown(f"""**{titre}** @ {ent} — {duree}
-> _{res}_""")
-                    else:
-                        st.caption("Historique non disponible")
-
-                with right:
-                    sal = d.get("salaire", {})
-                    st.markdown(
-                        f"""
-                        <div style='padding:12px;border:1px solid #e2e8f0;border-radius:8px;background:white;text-align:center;'>
-                            <div style='font-size:0.75rem;color:#334155;text-transform:uppercase;'>Salaire Estimé</div>
-                            <div style='font-size:1.5rem;font-weight:800;color:var(--text-main);'>{sal.get('min',0)}–{sal.get('max',0)} k€</div>
-                            <div style='font-size:0.8rem;color:var(--primary);margin-top:4px;'>{sal.get('confiance','')}</div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-                    # Radar
-                    cat = ['Tech', 'Exp', 'Soft', 'Fit', 'Tech']
-                    val = [s.get('tech',0), s.get('experience',0), s.get('soft',0), s.get('fit',0), s.get('tech',0)]
-                    fig = go.Figure(go.Scatterpolar(r=val, theta=cat, fill='toself'))
-                    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=False, height=240, margin=dict(t=10,b=10,l=10,r=10))
-                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-
-                # Skills
-                st.markdown("#### 🛠️ Compétences")
-                comp = d.get("competences", {})
-                skills_html = "".join([f"<span class='skill-tag match'>✓ {sk}</span>" for sk in comp.get("match", [])])
-                skills_html += "".join([f"<span class='skill-tag missing'>{sk}</span>" for sk in comp.get("manquant", [])])
+            # Skills
+            st.markdown("#### 🛠️ Compétences")
+            comp = d.get("competences", {})
+            skills_html = "".join([f"<span class='skill-tag match'>✓ {sk}</span>" for sk in comp.get("match", [])])
+            skills_html += "".join([f"<span class='skill-tag missing'>{sk}</span>" for sk in comp.get("manquant", [])])
+            if skills_html:
                 st.markdown(skills_html, unsafe_allow_html=True)
+            else:
+                st.caption("Aucune compétence détectée")
 
-                with st.expander("🎯 Guide d'entretien"):
-                    for q in d.get("entretien", [])[:6]:
+            with st.expander("🎯 Guide d'entretien"):
+                questions = d.get("entretien", [])[:6]
+                if questions:
+                    for q in questions:
                         theme = q.get("theme", "Général")
                         st.markdown(f"**{theme}** — {q.get('question','')}\n\n> Attendu : _{q.get('attendu','')}_")
-
-            except Exception as e:
-                st.error(f"Affichage de la fiche impossible : {e}")
-                if st.session_state.get("debug"):
-                    st.exception(e)
-
+                else:
+                    st.caption("Aucune question d'entretien générée")
+            
+            # DEBUG au bas de chaque fiche
             if st.session_state.get("debug"):
-                st.caption("FIN DE FICHE — DEBUG")
-                st.json(d)
+                with st.expander("🐛 DEBUG - Données brutes"):
+                    st.json(d)
 
 
 # -----------------------------
